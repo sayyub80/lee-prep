@@ -1,24 +1,76 @@
-// models/User.ts
-import mongoose, { Document, Model } from 'mongoose'
+import { Schema, model, models, Document } from 'mongoose';
+import bcrypt from 'bcryptjs';
 
-interface IUser extends Document {
-  name: string
-  email: string
-  password: string
-  image?: string
-  role?: string
-  createdAt: Date
+interface ISubscription {
+  plan: 'free' | 'pro' | 'premium';
+  startDate: Date;
+  endDate?: Date;
 }
 
-const UserSchema = new mongoose.Schema<IUser>({
+interface IUser extends Document {
+  name: string;
+  email: string;
+  password: string;
+  avatar?: string;
+  subscription: ISubscription;
+  credits: number;
+  referralCode: string;
+  referredBy?: Schema.Types.ObjectId;
+  streak: number;
+  isAccecptedTerm:{
+    type:boolean,
+    default:false
+  };
+  dailyProgress: {
+    completed: number;
+    goal: number;
+  };
+  speakingTimeMinutes: number;
+  accuracy: number;
+  achievements: string[];
+  comparePassword(candidatePassword: string): Promise<boolean>;
+}
+
+const UserSchema = new Schema<IUser>({
   name: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
-  image: { type: String },
-  role: { type: String, default: 'user' },
-  createdAt: { type: Date, default: Date.now }
-})
+  email: { type: String, required: true, unique: true, lowercase: true },
+  password: { type: String, required: true, select: false },
+  avatar: { type: String },
+  subscription: {
+    plan: { type: String, enum: ['free', 'pro', 'premium'], default: 'free' },
+    startDate: { type: Date, default: Date.now },
+    endDate: { type: Date }
+  },
+  credits: { type: Number, default: 0 },
+  referralCode: { type: String, unique: true },
+  referredBy: { type: Schema.Types.ObjectId, ref: 'User' },
+  streak: { type: Number, default: 0 },
+  dailyProgress: {
+    completed: { type: Number, default: 0 },
+    goal: { type: Number, default: 100 }
+  },
+  speakingTimeMinutes: { type: Number, default: 0 },
+  accuracy: { type: Number, default: 0 },
+  achievements: { type: [String], default: [] }
+}, { timestamps: true });
 
-const User: Model<IUser> = mongoose.models.User || mongoose.model<IUser>('User', UserSchema)
+UserSchema.pre('save', async function(next) {
+  if (!this.isModified('password')) return next();
+  
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+  
+  if (!this.referralCode) {
+    this.referralCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+  }
+  
+  next();
+});
 
-export default User
+UserSchema.methods.comparePassword = async function(
+  candidatePassword: string
+): Promise<boolean> {
+  return bcrypt.compare(candidatePassword, this.password);
+};
+
+export default models.User || model<IUser>('User', UserSchema);
