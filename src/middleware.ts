@@ -22,7 +22,7 @@ export async function middleware(request: NextRequest) {
   // 2. If user IS logged in and tries to access /login or /signup, redirect to dashboard
   if (
     token &&
-    (pathname === '/login' || pathname === '/signup')
+    (pathname === '/login' || pathname === '/sign-up')
   ) {
     // Optionally, verify token here if you want
     // const verifyResponse = await fetch(new URL('/api/auth/verify', request.url), { headers: { 'Cookie': `token=${token}` } });

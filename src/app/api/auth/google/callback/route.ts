@@ -2,11 +2,20 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import User from '@/models/User';
 import { generateToken } from '@/lib/jwt';
+import { cookies } from 'next/headers';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
-  if (!code) return NextResponse.redirect('/login?error=google_oauth_failed');
+
+  // Read referral code from cookie (with await)
+  const cookieStore = await cookies();
+  const referralCode = cookieStore.get('google_referral_code')?.value;
+
+  if (!code) {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    return NextResponse.redirect(`${baseUrl}/login?error=google_oauth_failed`);
+  }
 
   // Exchange code for tokens
   const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
@@ -21,7 +30,10 @@ export async function GET(request: Request) {
     }),
   });
   const tokenData = await tokenRes.json();
-  if (!tokenData.access_token) return NextResponse.redirect('/login?error=google_oauth_failed');
+  if (!tokenData.access_token) {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    return NextResponse.redirect(`${baseUrl}/login?error=google_oauth_failed`);
+  }
 
   // Fetch user info
   const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
@@ -32,17 +44,32 @@ export async function GET(request: Request) {
   await dbConnect();
   let user = await User.findOne({ email: profile.email });
   if (!user) {
-    user = await User.create({
+    user = new User({
       name: profile.name,
       email: profile.email,
       avatar: profile.picture,
       password: Math.random().toString(36), // random password, not used
     });
+
+    // Handle referral
+    if (referralCode) {
+      const referrer = await User.findOne({ referralCode });
+      if (referrer) {
+        user.referredBy = referrer._id;
+        referrer.credits += 10;
+        await referrer.save();
+      }
+    }
+
+    await user.save();
   }
 
-  // Generate JWT and set cookie
-  const token = generateToken({ userId: user._id.toString() });
-  const response = NextResponse.redirect('/dashboard');
+  // Generate JWT token for the user
+  const token = generateToken({ userId: user._id });
+
+  // Clear the referral code cookie and set auth token
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+  const response = NextResponse.redirect(`${baseUrl}/dashboard`);
   response.cookies.set('token', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -50,5 +77,7 @@ export async function GET(request: Request) {
     path: '/',
     maxAge: 60 * 60 * 24 * 7,
   });
+  response.cookies.set('google_referral_code', '', { maxAge: 0, path: '/' }); // delete cookie
+
   return response;
 }

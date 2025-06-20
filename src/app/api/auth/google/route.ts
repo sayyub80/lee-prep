@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const referralCode = searchParams.get('referralCode') || '';
   const rootUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
   const clientId = process.env.GOOGLE_CLIENT_ID;
   if (!clientId) {
@@ -19,5 +21,18 @@ export async function GET() {
   };
 
   const qs = new URLSearchParams(options).toString();
-  return NextResponse.redirect(`${rootUrl}?${qs}`);
+  const redirectUrl = `${rootUrl}?${qs}`;
+
+  // Set referralCode in a temporary cookie (expires in 10 minutes)
+  const response = NextResponse.redirect(redirectUrl);
+  if (referralCode) {
+    response.cookies.set('google_referral_code', referralCode, {
+      httpOnly: true,
+      maxAge: 600,
+      path: '/',
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    });
+  }
+  return response;
 }

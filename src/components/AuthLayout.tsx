@@ -24,21 +24,21 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({
       </Head>
       <div className="min-h-screen flex flex-col md:flex-row bg-white">
         {/* Image Section */}
-        <div className="md:w-1/2 bg-indigo-50 flex items-center justify-center p-12">
-          <div className="max-w-md">
+        <div className="pl-35 w-1/2 ">
+          <div className="">
             <Image
               src={imageSrc}
               alt={imageAlt}
               width={600}
-              height={600}
-              className="object-contain"
+              height={500}
+              className=""
               priority
             />
           </div>
         </div>
 
         {/* Form Section */}
-        <div className="md:w-1/2  flex   items-center justify-center p-8">
+        <div className="md:w-1/2  flex  -mt-15 items-center justify-center p-8">
           <div className="w-full max-w-md space-y-5">
             <div className="text-center">
               <h1 className="text-3xl font-bold text-gray-900">{title}</h1>

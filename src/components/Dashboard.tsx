@@ -32,7 +32,7 @@ export default function DashboardPage() {
     <div className="min-h-screen">
       
       
-      <div className="px-25 py-8 container">
+      <div className="px-30 py-8 ">
         <h1 className="text-3xl font-bold mb-8">Welcome back, {user.name}</h1>
 
         {/* Stats Grid */}
