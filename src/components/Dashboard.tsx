@@ -128,28 +128,28 @@ export default function DashboardPage() {
         )}
 
         {/* Quick Actions */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <ActionButton 
-            title="Today's Challenge" 
-            icon={<Zap className="w-4 h-4" />} 
-            color="bg-gradient-to-r from-orange-400 to-pink-500" 
-          />
-          <ActionButton 
-            title="Invite Friends" 
-            icon={<Users className="w-4 h-4" />} 
-            color="bg-gradient-to-r from-purple-500 to-indigo-600" 
-          />
-          <ActionButton 
-            title="Practice Now" 
-            icon={<MessageSquare className="w-4 h-4" />} 
-            color="bg-gradient-to-r from-blue-500 to-teal-400" 
-          />
-          <ActionButton 
-            title="View Courses" 
-            icon={<BookOpen className="w-4 h-4" />} 
-            color="bg-gradient-to-r from-green-500 to-emerald-600" 
-          />
-        </div>
+       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
+  <ActionButton 
+    title="Invite Friends" 
+    icon={<Users className="w-6 h-6" />} 
+    color="bg-gradient-to-r from-purple-500 to-indigo-600" 
+  />
+  <ActionButton 
+    title="Practice Now" 
+    icon={<MessageSquare className="w-6 h-6" />} 
+    color="bg-gradient-to-r from-blue-500 to-teal-400" 
+  />
+  <ActionButton 
+    title="Today's Challenge" 
+    icon={<Zap className="w-6 h-6" />} 
+    color="bg-gradient-to-r from-orange-400 to-pink-500" 
+  />
+  <ActionButton 
+    title="View Courses" 
+    icon={<BookOpen className="w-6 h-6" />} 
+    color="bg-gradient-to-r from-green-500 to-emerald-600" 
+  />
+</div>
       </div>
     </div>
   );
@@ -200,12 +200,29 @@ function ProgressCard({ title, icon, current, target, unit = "", color }: { titl
     </div>
   );
 }
-
 function ActionButton({ title, icon, color }: { title: string; icon: React.ReactNode; color: string }) {
   return (
-    <button className={`${color} text-white p-4 rounded-xl flex items-center gap-2 justify-center hover:opacity-90 transition`}>
-      {icon}
-      <span>{title}</span>
+    <button
+      className={`
+        ${color}
+        text-white
+        p-4
+        cursor-pointer
+        rounded-2xl
+        flex items-center gap-4 justify-between
+        shadow-md
+        hover:scale-105
+        hover:shadow-lg
+        transition
+        w-full
+      `}
+      style={{ minHeight: 64 }}
+    >
+      <span className="flex items-center gap-3 text-lg font-semibold">
+        <span className="text-2xl">{icon}</span>
+        {title}
+      </span>
+      <span className="text-xl opacity-70">&#8594;</span>
     </button>
   );
 }
