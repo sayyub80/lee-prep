@@ -9,6 +9,9 @@ interface User {
   email: string;
   avatar?: string;
   credits: number;
+  referredBy?: string; // ID of the user who referred them
+  isAcceptedTerms: boolean; // Whether the user has accepted terms and conditions
+  level?: string; // Added level field
   referralCode: string;
   referrals: string[];
   streak: number;

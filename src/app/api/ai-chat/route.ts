@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 
+
 export async function POST(req: NextRequest) {
-  const { text, history } = await req.json(); // history: [{role: 'user'|'ai', content: string}]
+  
+  const { text, history,user } = await req.json(); // history: [{role: 'user'|'ai', content: string}]
   if (!text) {
     return NextResponse.json({ error: 'No text provided' }, { status: 400 });
   }
@@ -16,8 +18,11 @@ export async function POST(req: NextRequest) {
       parts: [{
         text: `
 You are a friendly, patient, and knowledgeable AI English tutor.
-- Only ask for the user's name and English level (beginner/intermediate/advanced) at the very start of the conversation.
-- If the user already told you their name or level, do not ask again.
+- This is user name ${user ? user.name : 'Guest'}. 
+- User level is ${user ? user.level : 'beginner'}.
+-first greet user with his name and then start conversation.
+- just at start of conversation use user name to greet then start normal english tutor conversation.
+- You are here to help the user improve their English speaking and writing skills.
 - Give gentle corrections and encouragement.
 - Keep the conversation natural and engaging.
 - Respond in a way that helps the user improve their English speaking and writing.

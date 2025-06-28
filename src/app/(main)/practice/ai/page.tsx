@@ -1,6 +1,7 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import { Mic, Send, Bot, Volume2, VolumeX, Loader2, Info, Sparkles } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 declare global {
   interface Window {
@@ -9,6 +10,7 @@ declare global {
 }
 
 export default function AIPracticePage() {
+   const { user, loading } = useAuth();
   const [messages, setMessages] = useState<{ text: string; sender: "user" | "ai" }[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -18,6 +20,7 @@ export default function AIPracticePage() {
   const [conversationFeedback, setConversationFeedback] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
   const chatEndRef = useRef<HTMLDivElement>(null); // For auto-scroll
+
 
   // Speech recognition setup
   useEffect(() => {
@@ -74,11 +77,16 @@ export default function AIPracticePage() {
         content: m.text,
       }));
 
-      const res = await fetch("/api/ai-chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, history }),
-      });
+      // Example in your page/component
+const res = await fetch("/api/ai-chat", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    text,
+    history,
+    user: { name: user?.name, level: user?.level || "beginner" }, // <-- pass user info here
+  }),
+});
       const data = await res.json();
       if (data.text) {
         const aiResponse = { text: data.text, sender: "ai" as const };
@@ -105,8 +113,8 @@ export default function AIPracticePage() {
       window.speechSynthesis.cancel(); // Stop any ongoing speech immediately
       const utterance = new SpeechSynthesisUtterance();
       utterance.text = text.split("\n\nFeedback:")[0];
-      utterance.rate = 1.3;
-      utterance.pitch = 1.2;
+      utterance.rate = 1.5;
+      utterance.pitch = 2;
       window.speechSynthesis.speak(utterance);
     }
   };
@@ -138,13 +146,10 @@ export default function AIPracticePage() {
   return (
     <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-200/70 via-blue-100/80 to-white/90 overflow-hidden">
       {/* Background image with overlay */}
-      <img
-        src="https://images.unsplash.com/photo-1513258496099-48168024aec0?auto=format&fit=crop&w=1200&q=80"
-        alt="English Conversation Background"
-        className="absolute inset-0 w-full h-full object-cover object-center opacity-40 blur-sm pointer-events-none z-0"
-        draggable={false}
-      />
-      <div className="absolute inset-0 bg-gradient-to-br from-indigo-300/60 via-blue-100/60 to-white/80 z-0" />
+     {/* Decorative blurred blobs */}
+    <div className="absolute -top-32 -left-32 w-96 h-96 bg-indigo-600 opacity-30 rounded-full filter blur-3xl z-0" />
+    <div className="absolute top-1/2 right-0 w-80 h-80 bg-blue-500 opacity-30 rounded-full filter blur-2xl z-0" />
+    <div className="absolute bottom-0 left-1/2 w-72 h-72 bg-yellow-400 opacity-40 rounded-full filter blur-2xl z-0" />
       {/* Main Card */}
       <div className="relative z-10 max-w-2xl w-full mx-auto bg-white/80 backdrop-blur-lg rounded-3xl shadow-2xl p-0 md:p-8 flex flex-col border border-indigo-100">
         {/* Header */}
@@ -179,7 +184,7 @@ export default function AIPracticePage() {
         {/* Chat Area */}
         <div className="flex-1 flex flex-col overflow-hidden">
           <div
-            className="flex-1 flex flex-col justify-end px-4 py-4 space-y-4"
+            className="flex-1 flex flex-col px-4 py-4 space-y-4"
             style={{
               maxHeight: "420px", // Fixed max height for chat area
               minHeight: "320px",
@@ -275,87 +280,98 @@ export default function AIPracticePage() {
         </button>
         {/* Feedback Modal/Drawer */}
         {showFeedback && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center pointer-events-none">
-            <div className="w-full max-w-lg mx-auto mb-8 pointer-events-auto">
-              <div className="bg-white/80 backdrop-blur-xl border border-indigo-100 rounded-3xl shadow-2xl p-8 relative animate-fade-in">
-                <div className="flex items-center mb-4">
-                  <Sparkles className="w-8 h-8 text-yellow-500 mr-3" />
-                  <span className="font-bold text-xl text-indigo-700">Your Conversation Feedback</span>
-                  <button
-                    className="ml-auto text-gray-400 hover:text-gray-700 text-2xl"
-                    onClick={() => setShowFeedback(false)}
-                  >
-                    ×
-                  </button>
-                </div>
-                <div className="text-gray-700 whitespace-pre-line text-base min-h-[80px]">
-                  {messages.length === 0 ? (
-                    <div className="flex flex-col items-center gap-2 py-8">
-                      <Info className="w-8 h-8 text-indigo-400" />
-                      <span className="text-indigo-700 font-semibold">Chat with AI to get feedback!</span>
-                      <span className="text-gray-500 text-sm">Start a conversation and your feedback will appear here.</span>
-                    </div>
-                  ) : conversationFeedback === "Loading..." ? (
-                    <div className="flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
-                      <span>Analyzing your conversation...</span>
-                    </div>
-                  ) : conversationFeedback ? (
-                    <>
-                      {/* Parse feedback into points */}
-                      {(() => {
-                        const wellMatch = conversationFeedback.match(/What you did well:\s*([\s\S]*?)\n\s*What to improve:/i);
-                        const improveMatch = conversationFeedback.match(/What to improve:\s*([\s\S]*)/i);
-                        const wellPoints = wellMatch ? wellMatch[1].split("\n").filter(line => line.trim().startsWith("-")).map(line => line.replace(/^-/, '').trim()) : [];
-                        const improvePoints = improveMatch ? improveMatch[1].split("\n").filter(line => line.trim().startsWith("-")).map(line => line.replace(/^-/, '').trim()) : [];
-                        return (
-                          <>
-                            <div className="mb-3">
-                              <span className="font-semibold text-green-700">What you did well:</span>
-                              <ul className="list-disc pl-6 text-green-900">
-                                {wellPoints.length > 0 ? wellPoints.map((point, idx) => (
-                                  <li key={idx}>{point}</li>
-                                )) : <li>No highlights yet.</li>}
-                              </ul>
-                            </div>
-                            <div>
-                              <span className="font-semibold text-red-700">What to improve:</span>
-                              <ul className="list-disc pl-6 text-red-900">
-                                {improvePoints.length > 0 ? improvePoints.map((point, idx) => (
-                                  <li key={idx}>{point}</li>
-                                )) : <li>No suggestions yet.</li>}
-                              </ul>
-                            </div>
-                          </>
-                        );
-                      })()}
-                    </>
-                  ) : (
-                    <span>No feedback yet.</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-        {/* Info/Help Section */}
-        <div className="px-6 pb-6">
-          <div className="mt-2 p-4 bg-blue-50 rounded-lg flex items-center gap-3 text-sm text-blue-900 shadow">
-            <Volume2 className="w-5 h-5" />
-            <span>
-              AI responds with voice automatically. You can type or use the mic to talk!
-            </span>
-          </div>
-          <div className="mt-4 p-4 bg-yellow-50 rounded-lg text-xs text-yellow-800 shadow">
-            <span className="font-semibold">AI Feedback Includes:</span>
-            <ul className="list-disc pl-5 space-y-1">
-              <li>Pronunciation scoring</li>
-              <li>Grammar corrections</li>
-              <li>Vocabulary suggestions</li>
-              <li>Fluency analysis</li>
-            </ul>
-          </div>
+  <div className="fixed inset-0 z-50 flex items-end justify-center pointer-events-none">
+    <div className="w-full max-w-lg mx-auto mb-8 pointer-events-auto">
+      <div className="bg-white/80 backdrop-blur-xl border border-indigo-100 rounded-3xl shadow-2xl p-8 relative animate-fade-in">
+        <div className="flex items-center mb-4">
+          <Sparkles className="w-8 h-8 text-yellow-500 mr-3" />
+          <span className="font-bold text-xl text-indigo-700">Your Conversation Feedback</span>
+          <button
+            className="ml-auto text-gray-400 hover:text-gray-700 text-2xl"
+            onClick={() => setShowFeedback(false)}
+          >
+            ×
+          </button>
         </div>
+        <div className="text-gray-700 whitespace-pre-line text-base min-h-[80px]">
+          {messages.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-8">
+              <Info className="w-8 h-8 text-indigo-400" />
+              <span className="text-indigo-700 font-semibold">Chat with AI to get feedback!</span>
+              <span className="text-gray-500 text-sm">Start a conversation and your feedback will appear here.</span>
+            </div>
+          ) : conversationFeedback === "Loading..." ? (
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
+              <span>Analyzing your conversation...</span>
+            </div>
+          ) : conversationFeedback ? (
+            <>
+              {/* Parse feedback into points */}
+              {(() => {
+                const wellMatch = conversationFeedback.match(/What you did well:\s*([\s\S]*?)\n\s*What to improve:/i);
+                const improveMatch = conversationFeedback.match(/What to improve:\s*([\s\S]*)/i);
+                const wellPoints = wellMatch ? wellMatch[1].split("\n").filter(line => line.trim().startsWith("-")).map(line => line.replace(/^-/, '').trim()) : [];
+                const improvePoints = improveMatch ? improveMatch[1].split("\n").filter(line => line.trim().startsWith("-")).map(line => line.replace(/^-/, '').trim()) : [];
+                return (
+                  <>
+                    <div className="mb-3">
+                      <span className="font-semibold text-green-700">What you did well:</span>
+                      <ul className="list-disc pl-6 text-green-900">
+                        {wellPoints.length > 0 ? wellPoints.map((point, idx) => (
+                          <li key={idx}>{point}</li>
+                        )) : <li>No highlights yet.</li>}
+                      </ul>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-red-700">What to improve:</span>
+                      <ul className="list-disc pl-6 text-red-900">
+                        {improvePoints.length > 0 ? improvePoints.map((point, idx) => (
+                          <li key={idx}>{point}</li>
+                        )) : <li>No suggestions yet.</li>}
+                      </ul>
+                    </div>
+                  </>
+                );
+              })()}
+            </>
+          ) : (
+            <span>No feedback yet.</span>
+          )}
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+        {/* Info/Help Section */}
+       <div className="px-6 pb-6">
+  <div className="mt-2 p-4 bg-blue-50 rounded-lg flex items-center gap-3 text-base text-blue-900 shadow">
+    <Volume2 className="w-6 h-6 text-indigo-500" />
+    <span>
+      <span className="font-semibold">Tip:</span> You can <span className="font-semibold">type</span> or <span className="font-semibold">speak</span> to chat with the AI. The AI will reply with voice automatically!
+    </span>
+  </div>
+  <div className="mt-4 p-4 bg-yellow-50 rounded-lg text-sm text-yellow-900 shadow">
+    <span className="font-semibold block mb-2">What feedback will you get?</span>
+    <ul className="list-disc pl-6 space-y-1">
+      <li className="flex items-center gap-2">
+        <span role="img" aria-label="microphone">🎤</span> Pronunciation scoring
+      </li>
+      <li className="flex items-center gap-2">
+        <span role="img" aria-label="book">📖</span> Grammar corrections
+      </li>
+      <li className="flex items-center gap-2">
+        <span role="img" aria-label="bulb">💡</span> Vocabulary suggestions
+      </li>
+      <li className="flex items-center gap-2">
+        <span role="img" aria-label="rocket">🚀</span> Fluency analysis
+      </li>
+    </ul>
+    <div className="mt-2 text-xs text-yellow-700">
+      <span>Try to speak naturally and ask the AI anything about English!</span>
+    </div>
+  </div>
+</div>
       </div>
     </div>
   );

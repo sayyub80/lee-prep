@@ -27,6 +27,11 @@ interface IUser extends Document {
   };
   speakingTimeMinutes: number;
   accuracy: number;
+  level?:{
+    type: String,
+    enum: ['beginner', 'intermediate', 'advanced'],
+    default: 'beginner'
+  },
   achievements: string[];
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
