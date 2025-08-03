@@ -1,373 +1,191 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
-import { Mic, Copy, Send, User, MessageSquare, Phone, PhoneOff } from "lucide-react";
-import io from "socket.io-client";
+import React from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Mic, MicOff, Phone, PhoneOff, Loader2, UserSearch, Send } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import io, { Socket } from "socket.io-client";
 
-const socket = io("http://localhost:3000");
+type PageState = "idle" | "waiting" | "active" | "ended";
+type CallStatus = "none" | "outgoing" | "incoming" | "active";
+interface ChatMessage { text: string; sender: "me" | "partner"; }
+interface Partner { id: string; name: string; }
+interface Caller { id: string; name: string; }
 
 export default function OneToOnePage() {
-  const [messages, setMessages] = useState<
-    { text: string; sender: "me" | "partner" }[]
-  >([]);
-  const [input, setInput] = useState("");
-  const [isRecording, setIsRecording] = useState(false);
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [aiFeedback, setAiFeedback] = useState("");
-  const [inCall, setInCall] = useState(false);
-  const [modeDialogOpen, setModeDialogOpen] = useState(true);
-  const [mode, setMode] = useState<"chat" | "voice" | null>(null);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [partnerId, setPartnerId] = useState<string | null>(null);
-  const localAudioRef = useRef<HTMLAudioElement>(null);
-  const remoteAudioRef = useRef<HTMLAudioElement>(null);
+  const { user } = useAuth();
+  const [pageState, setPageState] = useState<PageState>("idle");
+  const [callStatus, setCallStatus] = useState<CallStatus>('none');
+  const [partner, setPartner] = useState<Partner | null>(null);
+  const [caller, setCaller] = useState<Caller | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [isMuted, setIsMuted] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(0);
+
+  const socketRef = useRef<Socket | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
   useEffect(() => {
-    if (!mode) return;
+    if (callStatus === "active" && timeRemaining > 0) {
+      timerRef.current = setInterval(() => setTimeRemaining(prev => prev > 0 ? prev - 1 : 0), 1000);
+    } else if (timeRemaining <= 0 && callStatus === "active") {
+      endCall("Time's up! Hope you had a great conversation.");
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [callStatus, timeRemaining]);
 
-    setIsConnecting(true);
-    socket.emit("join", mode);
+  const cleanupAndReset = useCallback(() => {
+    pcRef.current?.close();
+    localStreamRef.current?.getTracks().forEach(track => track.stop());
+    if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
+    pcRef.current = null;
+    localStreamRef.current = null;
+    setPartner(null);
+    setCaller(null);
+    setMessages([]);
+    setChatInput("");
+    setIsMuted(false);
+    setCallStatus('none');
+    if (timerRef.current) clearInterval(timerRef.current);
+    setTimeRemaining(0);
+  }, []);
 
-    socket.on("waiting", () => {
-      console.log("Waiting for a partner...");
-    });
-
-    socket.on("matched", async ({ partnerId, chatSessionId }) => {
-      setPartnerId(partnerId);
-      setModeDialogOpen(false);
-      setIsConnecting(false);
-      console.log("Matched with partner:", partnerId);
-
-      // Fetch chat history for the session
-      if (chatSessionId) {
-        try {
-          const token = localStorage.getItem('token'); // Assuming token is stored in localStorage
-          const res = await fetch(`/api/chat/messages/${chatSessionId}`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
-          if (res.ok) {
-            const messagesData = await res.json();
-            const formattedMessages = messagesData.map((msg: any) => ({
-              text: msg.text,
-              sender: msg.sender === partnerId ? 'partner' : 'me',
-            }));
-            setMessages(formattedMessages);
-          }
-        } catch (err) {
-          console.error('Failed to fetch chat history:', err);
-        }
+  const createPeerConnection = useCallback(() => {
+    if (pcRef.current) return pcRef.current;
+    const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+    pc.onicecandidate = (event) => {
+      if (event.candidate && partner?.id) {
+        socketRef.current?.emit("ice-candidate", { to: partner.id, candidate: event.candidate });
       }
+    };
+    pc.ontrack = (event) => {
+      if (remoteAudioRef.current) remoteAudioRef.current.srcObject = event.streams[0];
+    };
+    pcRef.current = pc;
+    return pc;
+  }, [partner]);
 
-      if (mode === "voice") {
-        setupCall();
-      }
+  useEffect(() => {
+    const socket = io("http://localhost:4000");
+    socketRef.current = socket;
+
+    socket.on("waiting", () => setPageState("waiting"));
+    socket.on("matched", ({ partner, duration }) => {
+      setPartner(partner);
+      setTimeRemaining(duration);
+      setPageState("active");
     });
-
-    socket.on("signal", async ({ from, signalData }) => {
-      if (!pcRef.current) return;
-      if (signalData.type === "offer") {
-        await pcRef.current.setRemoteDescription(
-          new RTCSessionDescription(signalData)
-        );
-        const answer = await pcRef.current.createAnswer();
-        await pcRef.current.setLocalDescription(answer);
-        socket.emit("signal", { partnerId: from, signalData: answer });
-      } else if (signalData.type === "answer") {
-        await pcRef.current.setRemoteDescription(
-          new RTCSessionDescription(signalData)
-        );
-      } else if (signalData.candidate) {
-        await pcRef.current.addIceCandidate(signalData);
-      }
+    socket.on("incoming-call", ({ from, signal }) => {
+        setCaller(from);
+        setCallStatus('incoming');
+        const pc = createPeerConnection();
+        pc.setRemoteDescription(new RTCSessionDescription(signal));
     });
-
-    socket.on("chat-message", ({ from, message }) => {
-      setMessages((prev) => [...prev, { text: message, sender: "partner" }]);
+    socket.on("call-accepted", async ({ signal }) => {
+        await pcRef.current?.setRemoteDescription(new RTCSessionDescription(signal));
+        setCallStatus('active');
     });
-
-    socket.on("partner-disconnected", () => {
+    socket.on("call-declined", () => {
+        alert(`${partner?.name || 'Partner'} declined the call.`);
+        setCallStatus('none');
+        localStreamRef.current?.getTracks().forEach(track => track.stop());
+        localStreamRef.current = null;
+    });
+    socket.on("ice-candidate", (candidate) => pcRef.current?.addIceCandidate(new RTCIceCandidate(candidate)));
+    socket.on('receive-chat-message', ({ message }: { message: string }) => {
+      setMessages(prev => [...prev, { text: message, sender: "partner" }]);
+    });
+    socket.on('partner-disconnected', () => {
       alert("Your partner has disconnected.");
-      endCall();
-      setPartnerId(null);
-      setModeDialogOpen(true);
-      setMode(null);
-      setMessages([]);
-      setIsConnecting(false);
+      cleanupAndReset();
+      setPageState('ended');
     });
 
     return () => {
-      socket.off("waiting");
-      socket.off("matched");
-      socket.off("signal");
-      socket.off("chat-message");
-      socket.off("partner-disconnected");
+      cleanupAndReset();
+      socket.disconnect();
     };
-  }, [mode]);
+  }, [cleanupAndReset, createPeerConnection]);
 
-  // Initialize WebRTC
-  const setupCall = async () => {
+  const findPartner = () => { if (user) { socketRef.current?.emit("join-chat", { name: user.name }); setPageState("waiting"); } };
+  const startCall = async () => {
+    if (!partner) return;
     try {
-      const pc = new RTCPeerConnection({
-        iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-      });
-      pcRef.current = pc;
-
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      if (localAudioRef.current) localAudioRef.current.srcObject = stream;
-
-      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-
-      pc.onicecandidate = (event) => {
-        if (event.candidate && partnerId) {
-          socket.emit("signal", {
-            partnerId,
-            signalData: event.candidate,
-          });
-        }
-      };
-
-      pc.ontrack = (event) => {
-        if (remoteAudioRef.current) {
-          remoteAudioRef.current.srcObject = event.streams[0];
-        }
-      };
-
-      setInCall(true);
-
+      localStreamRef.current = stream;
+      const pc = createPeerConnection();
+      stream.getTracks().forEach(track => pc.addTrack(track, stream));
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      if (partnerId) {
-        socket.emit("signal", { partnerId, signalData: offer });
-      }
-    } catch (err) {
-      console.error("Error setting up call:", err);
+      socketRef.current?.emit('outgoing-call', { to: partner.id, from: { id: user?.id, name: user?.name }, signal: offer });
+      setCallStatus('outgoing');
+    } catch (error) { alert("Could not access microphone."); }
+  };
+  const acceptCall = async () => {
+    if (!caller || !pcRef.current) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      localStreamRef.current = stream;
+      stream.getTracks().forEach(track => pcRef.current?.addTrack(track, stream));
+      const answer = await pcRef.current.createAnswer();
+      await pcRef.current.setLocalDescription(answer);
+      socketRef.current?.emit('call-accepted', { to: caller.id, signal: answer });
+      setCallStatus('active');
+    } catch (error) { alert("Could not access microphone."); }
+  };
+  const declineCall = () => { if (caller?.id) { socketRef.current?.emit('call-declined', { to: caller.id }); setCallStatus('none'); setCaller(null); } };
+  const endCall = (message = "You ended the call.") => {
+    alert(message);
+    socketRef.current?.emit('leave-session');
+    cleanupAndReset();
+    setPageState('ended');
+  };
+  const toggleMute = () => {
+    const audioTrack = localStreamRef.current?.getAudioTracks()[0];
+    if (audioTrack) { audioTrack.enabled = !audioTrack.enabled; setIsMuted(!audioTrack.enabled); }
+  };
+  const handleSendChatMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (chatInput.trim() && partner?.id) {
+        socketRef.current?.emit('send-chat-message', { to: partner.id, message: chatInput });
+        setMessages(prev => [...prev, { text: chatInput, sender: "me" }]);
+        setChatInput("");
     }
   };
-
-  const endCall = () => {
-    pcRef.current?.close();
-    pcRef.current = null;
-    if (localAudioRef.current) localAudioRef.current.srcObject = null;
-    if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
-    setInCall(false);
-  };
-
-  const handleSend = () => {
-    if (input.trim() && partnerId) {
-      setMessages([...messages, { text: input, sender: "me" }]);
-      socket.emit("chat-message", input);
-      setInput("");
-    }
-  };
-
-  const startRecording = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const mediaRecorder = new MediaRecorder(stream);
-    mediaRecorder.start();
-    setIsRecording(true);
-
-    const audioChunks: BlobPart[] = [];
-    mediaRecorder.ondataavailable = (e) => {
-      audioChunks.push(e.data);
+  const formatTime = (seconds: number) => new Date(seconds * 1000).toISOString().substr(14, 5);
+  
+  const renderInitialView = () => {
+    const stateContent: Record<PageState, { icon: React.ReactElement | null; title: string; sub: string; btn: string | null; action?: () => void; }> = {
+        idle: { icon: <UserSearch size={64} className="mx-auto mb-4 text-primary"/>, title: "Practice Live", sub: "Find a partner for a voice and text chat.", btn: "Find a Partner", action: findPartner },
+        waiting: { icon: <Loader2 size={48} className="animate-spin mx-auto mb-4" />, title: "Waiting for a partner...", sub: "This may take a moment.", btn: null },
+        active: { icon: null, title: "", sub: "", btn: null }, // Handled by the main component render
+        ended: { icon: null, title: "Session Ended", sub: "Hope you had a great conversation!", btn: "Find Another Partner", action: () => setPageState("idle") }
     };
+    const current = stateContent[pageState];
+    if(pageState === 'active') return null;
 
-    mediaRecorder.onstop = () => {
-      const audioBlob = new Blob(audioChunks);
-      // In real app: Send audio to partner
-      setIsRecording(false);
-    };
+    return (<div className="container py-8 flex flex-col items-center justify-center min-h-[70vh]"><div className="text-center">{current.icon}<h2 className="text-2xl font-bold mb-2">{current.title}</h2><p className="text-muted-foreground mb-6">{current.sub}</p>{current.btn && <Button size="lg" onClick={current.action}>{current.btn}</Button>}</div></div>);
   };
-
-  const stopRecording = () => {
-    setIsRecording(false);
-  };
-
-  const getFeedback = async () => {
-    const conversation = messages.map((m) => `${m.sender}: ${m.text}`).join("\n");
-    setAiFeedback(
-      `Feedback on your conversation:\n\n1. Vocabulary: 7/10\n2. Grammar: 6/10\n3. Fluency: 8/10\n\nFocus areas: Past tense usage, articles (a/an/the)`
-    );
-    setShowFeedback(true);
-  };
+  if (pageState !== "active") return renderInitialView();
 
   return (
-    <div className="px-25 py-8">
-      <h1 className="text-3xl font-bold mb-6">1:1 Conversation Practice</h1>
-
-      {modeDialogOpen && (
-        <div className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-80 max-w-full shadow-lg border border-gray-300">
-            <h2 className="text-xl font-semibold mb-4">Choose Conversation Mode</h2>
-          <div className="flex flex-col gap-4">
-            <button
-              onClick={() => setMode("chat")}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
-            >
-              Chat (Text)
-            </button>
-            <button
-              onClick={() => setMode("voice")}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-            >
-              Voice Call
-            </button>
-          </div>
-        </div>
-      </div>
-    )}
-    {isConnecting && (
-      <div className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 w-80 max-w-full shadow-lg border border-gray-300 text-center">
-          <p className="text-lg font-medium">Connecting to partner...</p>
-        </div>
-      </div>
-    )}
-
-      {!modeDialogOpen && (
-        <>
-          {mode === "voice" && (
-            <div className="mb-8 p-4 bg-blue-50 rounded-lg">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold flex items-center gap-2">
-                  <Phone className="w-5 h-5" /> Voice Call
-                </h2>
-                {!inCall ? (
-                  <button
-                    onClick={setupCall}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-                  >
-                    Start Call
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 text-green-600">
-                      <span className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></span>
-                      <span>Connecting to partner...</span>
-                    </div>
-                    <button
-                      onClick={endCall}
-                      className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
-                    >
-                      <PhoneOff className="w-5 h-5" /> End Call
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {inCall && (
-                <div className="mt-4 grid md:grid-cols-2 gap-4">
-                  <div className="p-4 border rounded-lg bg-white">
-                    <h3 className="font-medium mb-2 flex items-center gap-2">
-                      <User className="w-4 h-4" /> You
-                    </h3>
-                    <audio ref={localAudioRef} autoPlay muted className="w-full" />
-                  </div>
-                  <div className="p-4 border rounded-lg bg-white">
-                    <h3 className="font-medium mb-2 flex items-center gap-2">
-                      <User className="w-4 h-4" /> Partner
-                    </h3>
-                    <audio ref={remoteAudioRef} autoPlay className="w-full" />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {mode === "chat" && (
-            <div className="border rounded-xl p-6 h-[500px] flex flex-col bg-white">
-              <div className="flex-1 overflow-y-auto mb-4 space-y-4">
-                {messages.length === 0 && (
-                  <div className="text-gray-600 italic mb-4">Connecting to partner...</div>
-                )}
-                {messages.map((msg, i) => (
-                  <div
-                    key={i}
-                    className={`flex ${
-                      msg.sender === "me" ? "justify-end" : "justify-start"
-                    }`}
-                  >
-                    <div
-                      className={`max-w-xs lg:max-w-md p-4 rounded-lg ${
-                        msg.sender === "me" ? "bg-indigo-100" : "bg-gray-100"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <User className="w-4 h-4" />
-                        <span className="font-medium">
-                          {msg.sender === "me" ? "You" : "Partner"}
-                        </span>
-                      </div>
-                      <p>{msg.text}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Type your message..."
-                  className="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                  onKeyPress={(e) => e.key === "Enter" && handleSend()}
-                />
-                <button
-                  onClick={handleSend}
-                  className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
-                >
-                  <Send className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={isRecording ? stopRecording : startRecording}
-                  className={`p-2 rounded-lg transition ${
-                    isRecording ? "bg-red-500 text-white" : "bg-gray-200 hover:bg-gray-300"
-                  }`}
-                >
-                  <Mic className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="border rounded-xl p-6 bg-white mt-6">
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-indigo-600" /> Conversation Feedback
-            </h2>
-
-            {messages.length > 0 ? (
-              <>
-                <button
-                  onClick={getFeedback}
-                  className="mb-4 flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
-                >
-                  <Copy className="w-4 h-4" /> Get AI Feedback
-                </button>
-
-                {showFeedback && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 whitespace-pre-line">
-                    {aiFeedback}
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="text-gray-500 italic">Start a conversation to get feedback</div>
-            )}
-
-            <div className="mt-8">
-              <h3 className="font-medium mb-2">Tips for effective practice:</h3>
-              <ul className="list-disc pl-5 space-y-1 text-gray-600">
-                <li>Don't worry about mistakes</li>
-                <li>Try to speak in complete sentences</li>
-                <li>Ask follow-up questions</li>
-                <li>Use the voice call for pronunciation practice</li>
-              </ul>
-            </div>
-          </div>
-        </>
-      )}
+    <div className="container py-8 relative">
+      {callStatus === 'incoming' && (<div className="fixed inset-0 bg-black/70 z-50 flex flex-col items-center justify-center text-white animate-in fade-in-0"><Avatar className="w-24 h-24 mb-4"><AvatarFallback className="text-4xl">{caller?.name?.charAt(0)}</AvatarFallback></Avatar><h2 className="text-3xl font-bold">{caller?.name} is calling...</h2><div className="flex gap-4 mt-8"><Button size="lg" className="bg-red-600 hover:bg-red-700 rounded-full w-20 h-20" onClick={declineCall}><PhoneOff className="w-8 h-8"/></Button><Button size="lg" className="bg-green-600 hover:bg-green-700 rounded-full w-20 h-20" onClick={acceptCall}><Phone className="w-8 h-8"/></Button></div></div>)}
+      <div className="max-w-3xl mx-auto border rounded-xl shadow-lg bg-card flex flex-col h-[70vh] overflow-hidden">
+        { (callStatus === 'outgoing' || callStatus === 'active') ? (<div className="flex-1 bg-background/95 backdrop-blur-sm flex flex-col items-center justify-between p-8 text-foreground"><div className="text-center mt-12"><Avatar className="w-24 h-24 mx-auto mb-4"><AvatarFallback className="text-4xl">{partner?.name?.charAt(0)}</AvatarFallback></Avatar><h2 className="text-3xl font-bold">{partner?.name}</h2><p className="text-lg text-muted-foreground">{callStatus === 'outgoing' ? 'Ringing...' : `Connected - ${formatTime(timeRemaining)}`}</p></div><div className="flex items-center gap-4"><Button variant={isMuted ? "destructive" : "secondary"} size="lg" className="rounded-full w-20 h-20" onClick={toggleMute}>{isMuted ? <MicOff className="w-8 h-8"/> : <Mic className="w-8 h-8"/>}</Button><Button variant="destructive" size="lg" className="rounded-full w-20 h-20" onClick={() => endCall()}><PhoneOff className="w-8 h-8"/></Button></div></div>) : (
+          <><header className="flex items-center justify-between p-4 border-b"><div className="flex items-center gap-3"><Avatar><AvatarFallback>{partner?.name?.charAt(0)}</AvatarFallback></Avatar><div><h2 className="font-semibold">{partner?.name}</h2><p className="text-xs text-muted-foreground">Chatting</p></div></div><Button variant="secondary" size="icon" onClick={startCall}><Phone className="w-5 h-5"/></Button></header>
+          <main className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 bg-secondary/30">{messages.map((msg, i) => (<div key={i} className={`flex items-end gap-2 ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>{msg.sender === 'partner' && <Avatar className="h-8 w-8"><AvatarFallback>{partner?.name?.charAt(0)}</AvatarFallback></Avatar>}<div className={`max-w-xs md:max-w-md p-3 rounded-2xl ${msg.sender === 'me' ? 'bg-primary text-primary-foreground rounded-br-none' : 'bg-background rounded-bl-none'}`}><p className="text-sm">{msg.text}</p></div></div>))}<div ref={chatEndRef} />
+          </main><footer className="p-4 border-t"><form className="flex gap-2" onSubmit={handleSendChatMessage}><Input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Type a message..." autoComplete="off"/><Button type="submit" size="icon"><Send/></Button></form></footer></>)}
+      </div><audio ref={remoteAudioRef} autoPlay />
     </div>
   );
 }
