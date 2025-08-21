@@ -121,3 +121,7 @@
   }
 }
 
+/* --- This is the ONLY custom rule you need for the LiveKit Chat UI --- */
+[data-lk-theme='default'] [data-lk-message-origin='local'] {
+  margin-left: auto;
+}

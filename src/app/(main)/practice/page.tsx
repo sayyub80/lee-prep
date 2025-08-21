@@ -22,10 +22,10 @@ const practiceModes = [
     href: "/practice/translate",
   },
   {
-    title: "Community Practice",
+    title: "Group Discussions",
     desc: "Join group discussions with other learners.",
     icon: <Users className="w-8 h-8 text-indigo-600" />,
-    href: "/practice/community",
+    href: "/practice/groups",
   },
 ];
 

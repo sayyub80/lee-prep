@@ -1,11 +1,9 @@
-// src/app/(main)/community/[groupId]/page.tsx
-
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import io, { Socket } from 'socket.io-client';
-import { Send, ArrowLeft, Loader2, Phone } from 'lucide-react';
+import { Send, ArrowLeft, Loader2, Phone, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -13,9 +11,18 @@ import { motion } from "framer-motion";
 import { LiveKitRoom, VideoConference } from '@livekit/components-react';
 import '@livekit/components-styles';
 
-interface Message { sender: { id: string; name: string }; text: string; }
-interface OnlineUser { id: string; name: string; }
+// --- Type Definitions ---
+interface Message {
+    _id?: string;
+    sender: { id: string; name: string };
+    text: string;
+}
+interface OnlineUser {
+    id: string;
+    name: string;
+}
 
+// --- Main Page Component ---
 export default function GroupChatPage() {
     const { user } = useAuth();
     const router = useRouter();
@@ -33,7 +40,9 @@ export default function GroupChatPage() {
     const socketRef = useRef<Socket | null>(null);
     const chatEndRef = useRef<HTMLDivElement | null>(null);
 
-    useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+    useEffect(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages]);
 
     useEffect(() => {
         if (!groupId || !user) return;
@@ -44,7 +53,11 @@ export default function GroupChatPage() {
                 const data = await res.json();
                 if (data.success) {
                     setGroup(data.data.group);
-                    setMessages(data.data.messages.map((msg: any) => ({ sender: { id: msg.sender, name: msg.senderName }, text: msg.text })));
+                    setMessages(data.data.messages.map((msg: any) => ({ 
+                        _id: msg._id,
+                        sender: { id: msg.sender.toString(), name: msg.senderName }, 
+                        text: msg.text 
+                    })));
                 }
             } catch (error) { console.error("Failed to fetch group data:", error); } 
             finally { setLoading(false); }
@@ -108,7 +121,7 @@ export default function GroupChatPage() {
     }
 
     return (
-        <div className="container py-4 h-[calc(100vh-80px)]">
+        <div className=" py-4 px-4 h-[calc(100vh-80px)]">
             <div className="flex h-full border rounded-xl shadow-lg bg-card overflow-hidden">
                 <div className="flex flex-col h-full flex-1">
                     <header className="flex items-center p-4 border-b">
@@ -119,16 +132,42 @@ export default function GroupChatPage() {
                         </Button>
                     </header>
 
-                    <main className="flex-1 overflow-y-auto p-6 flex flex-col gap-6 bg-secondary/20">
-                        {messages.map((msg, index) => (
-                            <motion.div key={index} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className={`flex items-end gap-3 ${msg.sender.id === user?.id ? 'justify-end' : 'justify-start'}`}>
-                                {msg.sender.id !== user?.id && <Avatar className="h-8 w-8"><AvatarFallback>{msg.sender.name.charAt(0).toUpperCase()}</AvatarFallback></Avatar>}
-                                <div className={`max-w-xs md:max-w-md p-3 rounded-2xl shadow-sm ${msg.sender.id === user?.id ? 'bg-primary text-primary-foreground rounded-br-none' : 'bg-background rounded-bl-none'}`}>
-                                    {msg.sender.id !== user?.id && <p className="text-xs font-bold mb-1 text-primary">{msg.sender.name}</p>}
-                                    <p className="text-sm">{msg.text}</p>
+                    <main className="flex-1 overflow-y-auto p-4 space-y-6">
+                        {group?.currentTopic?.title && (
+                            <div className="bg-background border-l-4 border-primary p-4 rounded-r-lg mb-2 self-center w-full max-w-2xl shadow-sm">
+                                <div className="flex items-start gap-3">
+                                    <Info className="h-5 w-5 text-primary mt-1 flex-shrink-0" />
+                                    <div><p className="font-semibold text-sm">Today's Topic</p><p className="font-medium">{group.currentTopic.title}</p></div>
                                 </div>
-                            </motion.div>
-                        ))}
+                            </div>
+                        )}
+                        
+                        {/* --- FINAL, CORRECTED MESSAGE DISPLAY LOGIC --- */}
+                        {messages.map((msg, index) => {
+                            const isUserMessage = msg.sender.id === user?.id;
+                            return (
+                                <motion.div
+                                    key={msg._id || index}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className={`w-full flex ${isUserMessage ? 'justify-end' : 'justify-start'}`}
+                                >
+                                    <div className={`flex items-start gap-2 max-w-[75%] ${isUserMessage ? 'flex-row-reverse' : 'flex-row'}`}>
+                                        <Avatar className="h-8 w-8">
+                                            <AvatarFallback>{msg.sender.name.charAt(0).toUpperCase()}</AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex flex-col">
+                                            <p className={`text-xs text-muted-foreground px-1 mb-1 ${isUserMessage ? 'text-right' : 'text-left'}`}>
+                                                {msg.sender.name}
+                                            </p>
+                                            <div className={`p-3 rounded-2xl shadow-sm break-words ${isUserMessage ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}>
+                                                <p className="text-sm">{msg.text}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            );
+                        })}
                         <div ref={chatEndRef} />
                     </main>
 
@@ -138,21 +177,11 @@ export default function GroupChatPage() {
                 </div>
 
                 <aside className="w-80 border-l flex-col hidden lg:flex bg-secondary/30">
-                    <div className="p-6 border-b">
-                        <h2 className="font-semibold text-lg">About this Group</h2>
-                        <p className="text-sm text-muted-foreground mt-2">{group?.description}</p>
-                    </div>
+                    <div className="p-6 border-b"><h2 className="font-semibold text-lg">About this Group</h2><p className="text-sm text-muted-foreground mt-2">{group?.description}</p></div>
                     <div className="p-6 flex-1">
                         <h3 className="font-semibold mb-4 flex items-center"><span className="relative flex h-3 w-3 mr-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span></span>Online Now ({onlineUsers.length})</h3>
                         <div className="space-y-4">
-                            {/* --- THE FIX IS HERE --- */}
-                            {onlineUsers.map(onlineUser => (
-                                // Added the unique 'key' prop to the root div
-                                <div key={onlineUser.id} className="flex items-center gap-3">
-                                    <Avatar className="h-9 w-9"><AvatarFallback>{onlineUser.name.charAt(0).toUpperCase()}</AvatarFallback></Avatar>
-                                    <span className="font-medium">{onlineUser.name}</span>
-                                </div>
-                            ))}
+                            {onlineUsers.map(onlineUser => (<div key={onlineUser.id} className="flex items-center gap-3"><Avatar className="h-9 w-9"><AvatarFallback>{onlineUser.name.charAt(0).toUpperCase()}</AvatarFallback></Avatar><span className="font-medium">{onlineUser.name}</span></div>))}
                         </div>
                     </div>
                 </aside>

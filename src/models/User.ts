@@ -32,7 +32,9 @@ interface IUser extends Document {
     enum: ['beginner', 'intermediate', 'advanced'],
     default: 'beginner'
   },
-  achievements: string[];
+   achievements: string[];
+  groups: Schema.Types.ObjectId[]; // <-- ADD THIS LINE
+  role: 'user' | 'admin'; // <-- ADD THIS LINE
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
@@ -56,7 +58,9 @@ const UserSchema = new Schema<IUser>({
   },
   speakingTimeMinutes: { type: Number, default: 0 },
   accuracy: { type: Number, default: 0 },
-  achievements: { type: [String], default: [] }
+   achievements: { type: [String], default: [] },
+  groups: [{ type: Schema.Types.ObjectId, ref: 'Group' }],
+  role: { type: String, enum: ['user', 'admin'], default: 'user' } 
 }, { timestamps: true });
 
 UserSchema.pre('save', async function(next) {

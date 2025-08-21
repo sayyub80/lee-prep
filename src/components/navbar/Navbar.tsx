@@ -3,9 +3,9 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Menu, X, Globe, Mic, BookOpen, Users, Crown, LayoutDashboard, User } from 'lucide-react';
+import { Menu, X, Globe, Mic, BookOpen, Users, Crown, LayoutDashboard, User, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/context/AuthContext'; // Assuming you have an AuthContext
+import { useAuth } from '@/context/AuthContext';
 
 const Navbar = () => {
   const router = useRouter();
@@ -18,7 +18,6 @@ const Navbar = () => {
   const toggleUserDropdown = () => setIsUserDropdownOpen(!isUserDropdownOpen);
 
   useEffect(() => {
-   
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsUserDropdownOpen(false);
@@ -52,22 +51,31 @@ const Navbar = () => {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center space-x-6">
-          {menuItems.map((item) => (
-            <Link
-              key={item.name}
-              href={item.path}
-              className="flex items-center text-foreground/70 hover:text-primary transition-colors"
-            >
-              {item.icon}
-              {item.name}
+          {user?.role === 'admin' && (
+            <Link href="/admin" className="flex items-center text-primary hover:text-primary/80 transition-colors font-semibold">
+                <Shield className="w-4 h-4 mr-2" />
+                Admin Panel
             </Link>
+          )}
+
+          {/* This logic now filters out 'Dashboard' for admins */}
+          {menuItems
+            .filter(item => user?.role !== 'admin' || item.name !== 'Dashboard')
+            .map((item) => (
+              <Link
+                key={item.name}
+                href={item.path}
+                className="flex items-center text-foreground/70 hover:text-primary transition-colors"
+              >
+                {item.icon}
+                {item.name}
+              </Link>
           ))}
         </nav>
 
         <div className="hidden md:flex items-center space-x-4">
           {user ? (
             <>
-            
               <Link href="/subscription">
                 <Button size="sm">
                   <Crown className="w-4 h-4 mr-2" />
@@ -138,16 +146,25 @@ const Navbar = () => {
         {isMenuOpen && (
           <div className="absolute top-16 left-0 right-0 bg-background border-b p-4 md:hidden">
             <nav className="flex flex-col space-y-4">
-              {menuItems.map((item) => (
-                <Link
-                  key={item.name}
-                  href={item.path}
-                  className="flex items-center text-foreground/70 hover:text-primary transition-colors"
-                  onClick={toggleMenu}
-                >
-                  {item.icon}
-                  {item.name}
-                </Link>
+              {user?.role === 'admin' && (
+                  <Link href="/admin" className="flex items-center text-primary hover:text-primary/80 transition-colors font-semibold" onClick={toggleMenu}>
+                      <Shield className="w-4 h-4 mr-2" />
+                      Admin Panel
+                  </Link>
+              )}
+              {/* This logic now filters out 'Dashboard' for admins in the mobile menu */}
+              {menuItems
+                .filter(item => user?.role !== 'admin' || item.name !== 'Dashboard')
+                .map((item) => (
+                  <Link
+                    key={item.name}
+                    href={item.path}
+                    className="flex items-center text-foreground/70 hover:text-primary transition-colors"
+                    onClick={toggleMenu}
+                  >
+                    {item.icon}
+                    {item.name}
+                  </Link>
               ))}
               
               <div className="flex flex-col space-y-2 pt-2 border-t">
