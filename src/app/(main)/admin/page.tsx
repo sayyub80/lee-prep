@@ -89,7 +89,7 @@ export default function AdminPage() {
   if (user?.role !== 'admin') return <div className="container py-12 text-center"><h1 className="text-3xl font-bold text-destructive">Access Denied</h1><p className="text-muted-foreground mt-2">You do not have permission to view this page.</p></div>;
 
   return (
-    <div className="container py-8">
+    <div className="px-8 py-8">
       <header className="mb-8"><h1 className="text-3xl font-bold tracking-tight flex items-center gap-3"><Shield /> Admin Panel</h1><p className="text-muted-foreground mt-1">Manage application content and features.</p></header>
       <main className="grid md:grid-cols-2 gap-8">
         {/* Create Group Card */}

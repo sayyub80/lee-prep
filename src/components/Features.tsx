@@ -1,120 +1,56 @@
+// src/components/Features.tsx
+import { MessagesSquare, Brain, Users, Languages } from 'lucide-react';
 
-import { 
-  MessagesSquare, 
-  Mic, 
-  Brain, 
-  Medal, 
-  ArrowUpRight, 
-  Globe, 
-  Gamepad2,
-  BookOpen,
-  Speech,
-  Users,
-  BadgeDollarSign,
-  Repeat,
-  Languages
-} from 'lucide-react';
-
-const Features = () => {
-  const coreFeatures = [
+export default function Features() {
+  const features = [
     {
-      icon: <MessagesSquare className="h-6 w-6 text-indigo-600" />,
-      title: "Live 1-on-1 Conversations",
-      description: "Practice with native speakers or peers matched by AI based on interests and skill levels."
+      icon: <MessagesSquare className="h-8 w-8 text-indigo-500" />,
+      color: "bg-indigo-100",
+      title: "1-on-1 Conversation",
+      description: "Practice speaking with peers from around the world in live, guided conversations."
     },
     {
-      icon: <Brain className="h-6 w-6 text-indigo-600" />,
+      icon: <Brain className="h-8 w-8 text-purple-500" />,
+      color: "bg-purple-100",
       title: "AI-Powered Speaking Coach",
-      description: "Get instant feedback on pronunciation, grammar, and fluency as you speak."
+      description: "Get instant, detailed feedback on your pronunciation, grammar, and fluency from our advanced AI."
     },
     {
-      icon: <BookOpen className="h-6 w-6 text-indigo-600" />,
-      title: "Structured Learning Paths",
-      description: "Follow courses from beginner to advanced with themed lessons for different contexts."
+      icon: <Users className="h-8 w-8 text-green-500" />,
+      color: "bg-green-100",
+      title: "Community Group Chats",
+      description: "Join topic-based discussion groups moderated by experts to practice in a relaxed, social setting."
     },
     {
-      icon: <Users className="h-6 w-6 text-indigo-600" />,
-      title: "Group Voice Chats",
-      description: "Join topic-based discussions moderated by experts to practice in a group setting."
+      icon: <Languages className="h-8 w-8 text-rose-500" />,
+      color: "bg-rose-100",
+      title: "Real-Time Voice Translation",
+      description: "Build confidence by speaking in your native language and hearing the instant English translation."
     }
   ];
 
-  const innovativeFeatures = [
-    {
-      icon: <BadgeDollarSign className="h-6 w-6 text-indigo-600" />,
-      title: '"Speak & Earn" Program', // Corrected string formatting
-      description: "Earn points for daily speaking practice that can be redeemed for premium features."
-    },
-     {
-    icon: <Languages className="w-8 h-8 text-indigo-600" />,
-    title: "Real-Time Translation",
-    description: "Speak in your language, get instant translations for bilingual practice.",
-  },
-    {
-      icon: <Speech className="h-6 w-6 text-indigo-600" />,
-      title: '"Role-Play" Mode', // Corrected string formatting
-      description: "Simulate real-life scenarios like ordering food or job interviews with AI or peers."
-    },
-    {
-      icon: <Medal className="h-6 w-6 text-indigo-600" />,
-      title: "Daily Challenges & Streaks",
-      description: "Build habits with daily speaking challenges and compete on leaderboards."
-    },
-    
-  ];
-
   return (
-    <section className="px-25 py-12 bg-secondary/50">
-      <div className="container px-4 md:px-6">
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <h2 className="text-3xl font-bold tracking-tight">Features That Make Us Different</h2>
-          <p className="text-muted-foreground mt-4">
-            Our platform combines practical features with innovative learning methods to help you become fluent fast.
+    <section className="py-20 px-12 md:py-28 bg-white">
+      <div className=" px-4 md:px-6">
+        <div className="text-center max-w-3xl mx-auto mb-16">
+          <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-gray-900">A Smarter Way to Learn</h2>
+          <p className="text-lg text-gray-600 mt-4">
+            Our platform is built on a foundation of proven learning techniques, delivered through modern technology.
           </p>
         </div>
 
-        <div className="space-y-12">
-          <div>
-            <h3 className="text-xl font-semibold mb-6 flex items-center">
-              <span className="bg-primary/10 text-primary p-1 rounded-md mr-2">
-                <Mic className="h-5 w-5" />
-              </span>
-              Core Features
-            </h3>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {coreFeatures.map((feature, index) => (
-                <div key={index} className="feature-card">
-                  <div className="mb-4">{feature.icon}</div>
-                  <h4 className="font-medium mb-2">{feature.title}</h4>
-                  <p className="text-sm text-muted-foreground">{feature.description}</p>
-                </div>
-              ))}
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          {features.map((feature, index) => (
+            <div key={index} className="bg-gray-50/50 p-8 rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all duration-300">
+              <div className={`flex items-center justify-center h-10 w-10 rounded-2xl ${feature.color} mb-6`}>
+                {feature.icon}
+              </div>
+              <h3 className="text-xl font-semibold mb-2 text-gray-800">{feature.title}</h3>
+              <p className="text-gray-500">{feature.description}</p>
             </div>
-          </div>
-
-          <div>
-            <h3 className="text-xl font-semibold mb-6 flex items-center">
-              <span className="bg-speak-purple/10 text-speak-purple p-1 rounded-md mr-2">
-                <Gamepad2 className="h-5 w-5" />
-              </span>
-              Innovative Features
-            </h3>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {innovativeFeatures.map((feature, index) => (
-                <div key={index} className="feature-card">
-                  <div className="mb-4">{feature.icon}</div>
-                  <h4 className="font-medium mb-2">{feature.title}</h4>
-                  <p className="text-sm text-muted-foreground">{feature.description}</p>
-                </div>
-              ))}
-            </div>
-          </div>
+          ))}
         </div>
-
-        
       </div>
     </section>
   );
 };
-
-export default Features;
