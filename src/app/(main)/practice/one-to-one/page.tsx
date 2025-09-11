@@ -99,7 +99,7 @@ export default function OneToOnePage() {
     // --- Core Logic Hooks ---
     useEffect(() => {
         if (pageState === 'waiting' && user) {
-            const socket = io("http://localhost:4000"); // Ensure this URL is in your env variables
+            const socket = io(process.env.NEXT_PUBLIC_SOCKET_URL!);
             socketRef.current = socket;
             
             socket.on('connect', () => {
