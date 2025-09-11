@@ -1,20 +1,18 @@
-// src/app/api/groups/[groupId]/join/route.ts
-
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Group from '@/models/Group';
 import User from '@/models/User';
 import { verifyToken } from '@/lib/jwt'; 
 
-// The context object containing params is the second argument.
-// We define its type here to fix the build error.
-export async function POST(req: NextRequest, context: { params: { groupId: string } }) {
+// This is the corrected and more robust type signature for dynamic routes.
+export async function POST(
+  req: NextRequest, 
+  { params }: { params: { groupId: string } }
+) {
   await dbConnect();
-  // Destructure groupId from context.params
-  const { groupId } = context.params;
+  const { groupId } = params; // Now destructure from the correctly typed params
 
   try {
-    // 1. Authenticate the user from their browser cookie
     const token = req.cookies.get('token')?.value;
     if (!token) {
         return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
@@ -22,8 +20,6 @@ export async function POST(req: NextRequest, context: { params: { groupId: strin
     const decoded = verifyToken(token);
     const userId = decoded.userId;
 
-    // 2. Add the user to the group's member list and vice-versa
-    // Using $addToSet prevents duplicates if the user is already a member
     await Group.updateOne(
         { _id: groupId },
         { $addToSet: { members: userId } }
