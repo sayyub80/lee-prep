@@ -100,7 +100,7 @@ io.on('connection', (socket: Socket) => {
   });
 });
 
-const PORT = 4000;
+const PORT = process.env.PORT || 4000; 
 server.listen(PORT, () => {
   console.log(`🚀 Real-time server is live on port ${PORT}`);
 });
