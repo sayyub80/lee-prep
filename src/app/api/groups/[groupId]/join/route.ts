@@ -4,18 +4,17 @@ import Group from '@/models/Group';
 import User from '@/models/User';
 import { verifyToken } from '@/lib/jwt'; 
 
-// This is the corrected and more robust type signature for dynamic routes.
 export async function POST(
   req: NextRequest, 
   { params }: { params: { groupId: string } }
 ) {
   await dbConnect();
-  const { groupId } = params; // Now destructure from the correctly typed params
+  const { groupId } = params;
 
   try {
     const token = req.cookies.get('token')?.value;
     if (!token) {
-        return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
     const decoded = verifyToken(token);
     const userId = decoded.userId;
