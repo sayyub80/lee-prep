@@ -6,9 +6,12 @@ import Group from '@/models/Group';
 import User from '@/models/User';
 import { verifyToken } from '@/lib/jwt'; 
 
-export async function POST(req: NextRequest, { params }: { params: { groupId: string } }) {
+// The context object containing params is the second argument.
+// We define its type here to fix the build error.
+export async function POST(req: NextRequest, context: { params: { groupId: string } }) {
   await dbConnect();
-  const { groupId } = params;
+  // Destructure groupId from context.params
+  const { groupId } = context.params;
 
   try {
     // 1. Authenticate the user from their browser cookie
