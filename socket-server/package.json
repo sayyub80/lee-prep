@@ -2,13 +2,15 @@
   "name": "socket-server",
   "version": "1.0.0",
   "description": "Socket.IO server for Lee Prep",
-  "main": "src/index.ts",
+  "main": "dist/index.js",
   "scripts": {
-    "start": "ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
     "dev": "nodemon src/index.ts"
   },
   "dependencies": {
-    "socket.io": "^4.7.5"
+    "socket.io": "^4.7.5",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@types/node": "^20.12.12",

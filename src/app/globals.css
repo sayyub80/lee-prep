@@ -121,10 +121,6 @@
   }
 }
 
-/* --- This is the ONLY custom rule you need for the LiveKit Chat UI --- */
-[data-lk-theme='default'] [data-lk-message-origin='local'] {
-  margin-left: auto;
-}
 @keyframes scroll {
   to {
     transform: translate(calc(-50% - 0.5rem));
@@ -141,4 +137,52 @@
   width: max-content;
   flex-wrap: nowrap;
   animation: scroll 50s linear infinite;
+}
+
+
+/* --- START: ROBUST LIVEKIT CHAT UI FIXES --- */
+
+/* This rule ensures the container for your messages pushes its content to the right. */
+[data-lk-theme='default'] .lk-chat-entry[data-lk-message-origin='local'] {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* This is the key fix. It targets the message bubble you send, prevents it from
+  growing to full width, and ensures the text inside wraps properly. 
+*/
+[data-lk-theme='default'] .lk-chat-entry[data-lk-message-origin='local'] .lk-message-body {
+  flex-grow: 0 !important;
+  word-break: normal !important;
+  white-space: pre-wrap !important;
+}
+
+/* --- END: ROBUST LIVEKIT CHAT UI FIXES --- */
+
+@layer utilities {
+  .animation-delay-2000 {
+    animation-delay: 2s;
+  }
+  .animation-delay-4000 {
+    animation-delay: 4s;
+  }
+}
+
+@keyframes blob {
+  0% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+}
+
+.animate-blob {
+  animation: blob 7s infinite;
 }

@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Loader2, UserSearch, WifiOff, PartyPopper } from "lucide-react";
+import { Loader2, UserSearch, WifiOff, PartyPopper, Users, Bot } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import io, { Socket } from "socket.io-client";
@@ -10,6 +10,7 @@ import {
 } from '@livekit/components-react';
 import '@livekit/components-styles';
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 
 // --- Type Definitions ---
 type PageState = "idle" | "waiting" | "active" | "ended";
@@ -17,6 +18,50 @@ interface Partner { id: string; name: string; }
 
 // --- Helper Functions ---
 const formatTime = (seconds: number) => new Date(seconds * 1000).toISOString().substr(14, 5);
+
+
+// --- Waiting Animation Component ---
+const WaitingAnimation = () => (
+    <div className="relative flex flex-col items-center justify-center gap-8">
+      <motion.div
+        className="relative flex items-center justify-center w-64 h-64"
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.5, ease: "easeInOut" }}
+      >
+        {[...Array(3)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute border-2 border-blue-500/50 rounded-full"
+            initial={{ width: 0, height: 0, opacity: 1 }}
+            animate={{
+              width: "100%",
+              height: "100%",
+              opacity: 0,
+            }}
+            transition={{
+              duration: 2.5,
+              ease: "easeInOut",
+              repeat: Infinity,
+              delay: i * 0.5,
+            }}
+          />
+        ))}
+        <div className="w-24 h-24 rounded-full bg-blue-600/20 backdrop-blur-md flex items-center justify-center shadow-lg">
+            <Users className="w-12 h-12 text-white/90 animate-pulse" />
+        </div>
+      </motion.div>
+      <motion.div
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.3, duration: 0.5 }}
+      >
+        <h2 className="text-2xl font-bold text-white tracking-wider">Finding a Partner...</h2>
+        <p className="text-blue-200/80 text-center mt-2">Connecting you with another learner.</p>
+      </motion.div>
+    </div>
+  );
+
 
 // --- Main Component ---
 export default function OneToOnePage() {
@@ -37,10 +82,9 @@ export default function OneToOnePage() {
         setPageState('waiting');
     };
 
-    // This function now correctly handles all session cleanup logic
     const handleLeave = useCallback((message = "You left the session.") => {
         if (socketRef.current) {
-            socketRef.current.emit('leave-session'); // Notify server
+            socketRef.current.emit('leave-session');
             socketRef.current.disconnect();
             socketRef.current = null;
         }
@@ -55,7 +99,7 @@ export default function OneToOnePage() {
     // --- Core Logic Hooks ---
     useEffect(() => {
         if (pageState === 'waiting' && user) {
-            const socket = io("http://localhost:4000");
+            const socket = io("http://localhost:4000"); // Ensure this URL is in your env variables
             socketRef.current = socket;
             
             socket.on('connect', () => {
@@ -115,41 +159,49 @@ export default function OneToOnePage() {
     }, [pageState, sessionTime, handleLeave]);
 
     // --- Render Logic ---
-    if (pageState !== 'active' || !liveKitToken) {
-        return (
-            <div className="w-full h-[calc(100vh-80px)] flex flex-col items-center justify-center text-center p-4 relative">
-                <AnimatePresence>
-                    {pageState === 'ended' && (
-                        <motion.div 
-                            initial={{ opacity: 0, scale: 0.7 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="absolute z-10 bg-card border rounded-xl shadow-2xl p-8"
-                        >
-                            <PartyPopper size={48} className="mx-auto mb-4 text-primary"/>
-                            <h2 className="text-2xl font-bold mb-2">Session Ended</h2>
-                            <p className="text-muted-foreground mb-6">{endMessage}</p>
-                            <Button size="lg" onClick={handleFindPartner}>Find Another Partner</Button>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+    const renderIdleOrWaiting = () => (
+      <div className="w-full h-[calc(100vh-80px)] flex flex-col items-center justify-center text-center p-4 relative overflow-hidden bg-[#0a092d]">
+          {/* Animated background */}
+          <div className="absolute inset-0 z-0">
+            <div className="absolute top-[-50px] left-[-50px] w-72 h-72 bg-purple-600 rounded-full mix-blend-screen filter blur-3xl opacity-40 animate-blob"></div>
+            <div className="absolute top-[-50px] right-[-50px] w-72 h-72 bg-blue-600 rounded-full mix-blend-screen filter blur-3xl opacity-40 animate-blob animation-delay-2000"></div>
+            <div className="absolute bottom-[-50px] left-1/2 w-72 h-72 bg-pink-600 rounded-full mix-blend-screen filter blur-3xl opacity-40 animate-blob animation-delay-4000"></div>
+          </div>
+  
+          <AnimatePresence>
+            {pageState === 'ended' && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.7 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                className="absolute z-20 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl p-8 text-white w-full max-w-md"
+              >
+                <PartyPopper size={48} className="mx-auto mb-4 text-yellow-300" />
+                <h2 className="text-2xl font-bold mb-2">Session Ended</h2>
+                <p className="text-white/80 mb-6">{endMessage}</p>
+                <Button size="lg" onClick={handleFindPartner} className="bg-white text-black hover:bg-gray-200 w-full">Find Another Partner</Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+  
+          <div className="relative z-10">
+            {pageState === 'idle' && (
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+                   <div className="w-24 h-24 mx-auto mb-6 bg-white/10 rounded-full flex items-center justify-center border border-white/20 shadow-lg">
+                      <UserSearch size={48} className="text-white/90"/>
+                   </div>
+                   <h2 className="text-4xl font-bold text-white mb-3">Practice Live Conversation</h2>
+                   <p className="text-lg text-white/80 mb-8 max-w-lg">Sharpen your speaking skills by connecting with a random partner for a timed, real-world conversation.</p>
+                   <Button size="lg" onClick={handleFindPartner} className="px-8 py-6 text-lg bg-white text-black hover:bg-gray-200 shadow-xl transition-transform hover:scale-105">Find a Partner</Button>
+               </motion.div>
+            )}
+            {pageState === 'waiting' && <WaitingAnimation />}
+          </div>
+      </div>
+  );
 
-                {pageState === 'idle' && (
-                     <>
-                        <UserSearch size={64} className="mx-auto mb-4 text-primary"/>
-                        <h2 className="text-2xl font-bold mb-2">Practice Live Conversation</h2>
-                        <p className="text-muted-foreground mb-6">Find a partner to start a video and chat session.</p>
-                        <Button size="lg" onClick={handleFindPartner}>Find a Partner</Button>
-                    </>
-                )}
-                 {pageState === 'waiting' && (
-                    <>
-                        <div className="relative w-48 h-48 flex items-center justify-center"><div className="absolute inset-0 border-4 border-dashed border-gray-300 rounded-full animate-spin-slow"></div><Loader2 className="w-12 h-12 animate-spin"/></div>
-                        <h2 className="text-xl font-semibold mt-8">Finding a partner...</h2>
-                        <p className="text-muted-foreground">Please wait, this may take a moment.</p>
-                    </>
-                )}
-            </div>
-        );
+    if (pageState !== 'active' || !liveKitToken) {
+        return renderIdleOrWaiting();
     }
 
     return (

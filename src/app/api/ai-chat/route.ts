@@ -4,35 +4,36 @@ import { GoogleGenAI } from '@google/genai';
 
 export async function POST(req: NextRequest) {
   
-  const { text, history,user } = await req.json(); // history: [{role: 'user'|'ai', content: string}]
+  const { text, history, user, personaPrompt } = await req.json(); // history: [{role: 'user'|'ai', content: string}]
   if (!text) {
     return NextResponse.json({ error: 'No text provided' }, { status: 400 });
+  }
+   if (!personaPrompt) {
+    return NextResponse.json({ error: 'No persona provided' }, { status: 400 });
   }
 
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
-    // Add system prompt as the first message
+    // The system prompt now dynamically includes the selected persona's instructions
     const systemPrompt = {
       role: "model",
       parts: [{
         text: `
-You are a friendly, patient, and knowledgeable AI English tutor.
-- This is user name ${user ? user.name : 'Guest'}. 
-- User level is ${user ? user.level : 'beginner'}.
--use user name to greet but  do not use user name is each sentence. use in first for greeting. and where it is necessary.
--Remember  do not use (**) or do not use (*) for point or other markdown formatting in your responses. Just use number(1,2 or i, ii etc) for making points.
--first greet user with his name and then start conversation.
-- just at start of conversation use user name to greet then start normal english tutor conversation.
-- You are here to help the user improve their English speaking and writing skills.
-- Give gentle corrections and encouragement.
-- Keep the conversation natural and engaging.
-- Respond in a way that helps the user improve their English speaking and writing.
-- Give feedback on grammar, vocabulary, and pronunciation when possible.
--if user asks for help with a specific topic, provide relevant explanations and examples.
--if user type wrong word,sentence first reply him and then correct it and explain the mistake.
-- Do not repeat your introduction or greeting in every reply.
-`
+          ${personaPrompt}
+
+          ---
+          General Rules:
+          - The user's name is ${user ? user.name : 'Guest'}. Their current English level is ${user ? user.level : 'beginner'}.
+          - At the very beginning of the conversation, greet the user by their name. Afterwards, only use their name where it feels natural.
+          - Do NOT use markdown like ** or * for formatting. Use numbered lists (1., 2.) if needed.
+          - Keep your responses concise, natural, and encouraging.
+          - If the user makes a grammar or vocabulary mistake, first give a natural reply to their message, and then on a new line, provide a gentle correction. For example:
+            User: "I goed to the store yesterday."
+            AI: "Oh, what did you buy at the store?
+            
+            By the way, a small correction: it's 'I went' instead of 'I goed'."
+        `
       }]
     };
 
@@ -45,7 +46,7 @@ You are a friendly, patient, and knowledgeable AI English tutor.
           }))]
         : [systemPrompt];
 
-    // Create chat session with history
+    // Create chat session with history using your preferred method
     const chat = ai.chats.create({
       model: 'gemini-1.5-flash',
       history: geminiHistory,
