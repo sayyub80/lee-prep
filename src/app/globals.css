@@ -186,3 +186,24 @@
 .animate-blob {
   animation: blob 7s infinite;
 }
+
+/* src/app/globals.css */
+
+/* --- Add this NEW block at the end. Remove any other .message-line styles. --- */
+
+/* This is the container for the entire message line */
+.message-line {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+}
+
+/* This rule forces YOUR message bubble to the right side */
+.message-line[data-is-user="true"] {
+  justify-content: flex-end;
+}
+
+/* This rule keeps OTHER users' messages on the left */
+.message-line[data-is-user="false"] {
+  justify-content: flex-start;
+}

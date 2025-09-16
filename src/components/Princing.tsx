@@ -49,8 +49,8 @@ const pricingPlans = [
 
 export default function Princing() {
   return (
-    <section className="py-20 md:py-28 bg-white">
-      <div className="container px-4 md:px-6">
+    <section className="py-20  md:py-28 bg-white">
+      <div className=" px-4 md:px-6">
         <div className="text-center max-w-2xl mx-auto mb-16">
           <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-gray-900">
             Choose Your Plan

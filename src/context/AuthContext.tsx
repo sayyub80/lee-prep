@@ -10,9 +10,9 @@ interface User {
   avatar?: string;
   credits: number;
   role: 'user' | 'admin';
-  referredBy?: string; // ID of the user who referred them
-  isAcceptedTerms: boolean; // Whether the user has accepted terms and conditions
-  level?: string; // Added level field
+  referredBy?: string;
+  isAcceptedTerms: boolean; 
+  level?: string; 
   referralCode: string;
   referrals: string[];
   streak: number;
@@ -35,7 +35,7 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  setUser: (user: User | null) => void; // Add this
+  setUser: (user: User | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType>(null!);
@@ -51,6 +51,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const res = await fetch('/api/auth/me');
         const data = await res.json();
         if (res.ok && data.user) {
+          // Fix: Ensure user has a name; if not, derive from email
+          if (!data.user.name || data.user.name.trim() === '') {
+            data.user.name = data.user.email.split('@')[0];
+          }
           setUser(data.user);
         }
       } catch (err) {
@@ -72,6 +76,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       const data = await res.json();
       if (res.ok) {
+        // Apply the same name-fix logic on login
+        if (data.user && (!data.user.name || data.user.name.trim() === '')) {
+            data.user.name = data.user.email.split('@')[0];
+        }
         setUser(data.user);
         router.push('/dashboard');
       } else {

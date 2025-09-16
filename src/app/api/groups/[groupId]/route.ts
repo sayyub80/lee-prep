@@ -9,7 +9,7 @@ export async function GET(req: NextRequest, { params }: { params: { groupId: str
   await dbConnect();
   
   // Destructure groupId directly from params
-  const { groupId } = params;
+  const { groupId } =  params;
 
   if (!groupId) {
     return NextResponse.json({ success: false, error: 'Group ID is missing' }, { status: 400 });

@@ -8,7 +8,6 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
 
-  // Read referral code from cookie (with await)
   const cookieStore = await cookies();
   const referralCode = cookieStore.get('google_referral_code')?.value;
 
@@ -17,7 +16,6 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${baseUrl}/login?error=google_oauth_failed`);
   }
 
-  // Exchange code for tokens
   const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -35,7 +33,6 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${baseUrl}/login?error=google_oauth_failed`);
   }
 
-  // Fetch user info
   const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
     headers: { Authorization: `Bearer ${tokenData.access_token}` },
   });
@@ -44,8 +41,11 @@ export async function GET(request: Request) {
   await dbConnect();
   let user = await User.findOne({ email: profile.email });
   if (!user) {
+    // --- FIX: Create a fallback name if one isn't provided by Google ---
+    const userName = profile.name || profile.email.split('@')[0];
+
     user = new User({
-      name: profile.name,
+      name: userName, // Use the new fallback name
       email: profile.email,
       avatar: profile.picture,
       password: Math.random().toString(36), // random password, not used
@@ -64,10 +64,8 @@ export async function GET(request: Request) {
     await user.save();
   }
 
-  // Generate JWT token for the user
   const token = generateToken({ userId: user._id });
 
-  // Clear the referral code cookie and set auth token
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
   const response = NextResponse.redirect(`${baseUrl}/dashboard`);
   response.cookies.set('token', token, {
@@ -77,7 +75,7 @@ export async function GET(request: Request) {
     path: '/',
     maxAge: 60 * 60 * 24 * 7,
   });
-  response.cookies.set('google_referral_code', '', { maxAge: 0, path: '/' }); // delete cookie
+  response.cookies.set('google_referral_code', '', { maxAge: 0, path: '/' }); 
 
   return response;
 }
