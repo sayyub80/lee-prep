@@ -27,7 +27,7 @@ const groupRooms = new Map<string, Map<string, { id: string; name: string }>>();
 io.on('connection', (socket: Socket) => {
   console.log(`✅ User connected: ${socket.id}`);
 
-  // --- LOGIC FOR 1:1 MATCHMAKING (RESTORED) ---
+  // --- LOGIC FOR 1:1 MATCHMAKING ---
   socket.on('join-chat', ({ name }: { name: string }) => {
     console.log(`➡️  User '${name}' (${socket.id}) is looking for a 1:1 partner.`);
     if (waitingUsers.some(user => user.socket.id === socket.id)) return;
@@ -63,6 +63,17 @@ io.on('connection', (socket: Socket) => {
 
   socket.on('send-group-message', (message: GroupMessage) => {
     socket.to(message.groupId).emit('receive-group-message', message);
+  });
+
+  // --- MODIFIED: LOGIC FOR INDIVIDUAL USER TO ENTER VOICE CHAT ---
+  socket.on('start-group-voice-chat', ({ groupId }: { groupId: string }) => {
+    const initiator = groupRooms.get(groupId)?.get(socket.id);
+    console.log(`🎤 User ${initiator?.name || socket.id} is entering voice chat for group: ${groupId}`);
+    
+    const livekitRoomName = groupId;
+
+    // This now emits the event ONLY back to the user who clicked the button.
+    socket.emit('group-voice-chat-started', { livekitRoomName });
   });
 
   // --- DISCONNECTION LOGIC ---
