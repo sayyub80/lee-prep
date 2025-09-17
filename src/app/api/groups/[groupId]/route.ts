@@ -8,8 +8,8 @@ import GroupMessage from '@/models/GroupMessage';
 export async function GET(req: NextRequest, { params }: { params: { groupId: string } }) {
   await dbConnect();
   
-  // Destructure groupId directly from params
-  const { groupId } =  params;
+  // Destructure groupId directly from the correctly received params object
+  const { groupId } = params;
 
   if (!groupId) {
     return NextResponse.json({ success: false, error: 'Group ID is missing' }, { status: 400 });
