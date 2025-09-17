@@ -9,7 +9,7 @@ export async function GET(request: Request) {
     throw new Error('GOOGLE_CLIENT_ID is not defined');
   }
   const options = {
-    redirect_uri: `${process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, '') || 'http://localhost:3000'}/api/auth/google/callback`,
+    redirect_uri: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/auth/google/callback`,
     client_id: clientId,
     access_type: 'offline',
     response_type: 'code',
