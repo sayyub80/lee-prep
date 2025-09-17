@@ -138,7 +138,7 @@ export default function GroupsLobbyPage() {
 
   return (
     <div className="bg-secondary/30 min-h-[calc(100vh-80px)]">
-        <div className="container py-8">
+        <div className="px-25 py-15l">
             <header className="flex flex-col md:flex-row justify-between items-start gap-4 mb-8">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3"><Users/> Group Discussions</h1>
