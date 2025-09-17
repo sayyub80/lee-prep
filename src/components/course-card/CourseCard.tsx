@@ -1,7 +1,7 @@
 // src/components/courses/course-card.tsx
 import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { ProgressCard } from "@/components/ui/progress-card";
+import { Progress } from "@/components/ui/progress";
 
 interface CourseCardProps {
   level: string;
@@ -35,7 +35,7 @@ export function CourseCard({ level, title, progress, lessons, image }: CourseCar
             <span>{lessons} lessons</span>
             <span>{progress}% complete</span>
           </div>
-          <ProgressCard value={progress} className="h-2" />
+          <Progress value={progress} className="h-2" />
         </CardContent>
       </Card>
     </Link>

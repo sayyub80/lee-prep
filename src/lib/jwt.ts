@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 
 type TokenPayload = {
   [key: string]: any;
@@ -8,9 +8,10 @@ export function generateToken(payload: TokenPayload): string {
   if (!process.env.JWT_SECRET) {
     throw new Error('JWT_SECRET is not configured');
   }
-  return jwt.sign(payload, process.env.JWT_SECRET as jwt.Secret, {
-    expiresIn: process.env.JWT_EXPIRE || '7d'
-  });
+  const options: SignOptions = {
+    expiresIn: (process.env.JWT_EXPIRE || '7d') as SignOptions['expiresIn']
+  };
+  return jwt.sign(payload, process.env.JWT_SECRET, options);
 }
 
 export function verifyToken(token: string): TokenPayload {

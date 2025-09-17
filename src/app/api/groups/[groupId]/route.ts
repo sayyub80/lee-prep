@@ -1,15 +1,14 @@
-// src/app/api/groups/[groupId]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Group from '@/models/Group';
 import GroupMessage from '@/models/GroupMessage';
 
-// The function signature is corrected to properly receive params
-export async function GET(req: NextRequest, { params }: { params: { groupId: string } }) {
+export async function GET(
+  req: NextRequest,
+  context: { params: Promise<{ groupId: string }> }
+) {
   await dbConnect();
-  
-  // Destructure groupId directly from the correctly received params object
-  const { groupId } = params;
+  const { groupId } = await context.params; // <-- await params!
 
   if (!groupId) {
     return NextResponse.json({ success: false, error: 'Group ID is missing' }, { status: 400 });
@@ -18,7 +17,7 @@ export async function GET(req: NextRequest, { params }: { params: { groupId: str
   try {
     const group = await Group.findById(groupId).populate('members', 'name avatar').lean();
     if (!group) {
-        return NextResponse.json({ success: false, error: 'Group not found' }, { status: 404 });
+      return NextResponse.json({ success: false, error: 'Group not found' }, { status: 404 });
     }
 
     const messages = await GroupMessage.find({ group: groupId }).sort({ createdAt: 1 }).limit(50).lean();

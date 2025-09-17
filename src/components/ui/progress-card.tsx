@@ -6,9 +6,10 @@ interface ProgressCardProps {
   title: string;
   description: string;
   value: number;
+  className?: string;
 }
 
-export function ProgressCard({ title, description, value }: ProgressCardProps) {
+export function ProgressCard({ title, description, value, className }: ProgressCardProps) {
   return (
     <Card>
       <CardHeader>
@@ -16,7 +17,7 @@ export function ProgressCard({ title, description, value }: ProgressCardProps) {
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
-        <Progress value={value} className="h-2" />
+        <Progress value={value} className={className || "h-2"} />
         <p className="mt-2 text-sm text-muted-foreground">
           {value}% complete
         </p>

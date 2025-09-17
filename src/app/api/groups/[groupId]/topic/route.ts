@@ -5,9 +5,12 @@ import Group from '@/models/Group';
 import User from '@/models/User';
 import { verifyToken } from '@/lib/jwt';
 
-export async function POST(req: NextRequest, { params }: { params: { groupId: string } }) {
+export async function POST(
+  req: NextRequest,
+  context: { params: Promise<{ groupId: string }> }
+) {
   await dbConnect();
-  const { groupId } = params;
+  const { groupId } = await context.params;
 
   try {
     // 1. Authenticate the admin

@@ -46,7 +46,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-secondary/30">
-      <main className="px-11  py-8">
+      <main className="px-25  py-8">
         <h1 className="text-3xl font-bold mb-8 text-gray-800">Welcome back, {user.name}</h1>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

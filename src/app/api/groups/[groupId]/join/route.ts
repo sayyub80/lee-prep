@@ -6,10 +6,10 @@ import { verifyToken } from '@/lib/jwt';
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { groupId: string } }
+  context: { params: Promise<{ groupId: string }> }
 ) {
   await dbConnect();
-  const { groupId } = params;
+  const { groupId } = await context.params; // <-- await params!
 
   try {
     const token = req.cookies.get('token')?.value;
