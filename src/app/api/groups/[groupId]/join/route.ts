@@ -2,26 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Group from '@/models/Group';
 import User from '@/models/User';
-import { verifyToken } from '@/lib/jwt'; 
-
-interface Context {
-  params: {
-    groupId: string;
-  };
-}
+import { verifyToken } from '@/lib/jwt';
 
 export async function POST(
   req: NextRequest,
-  context: Context
+  { params }: { params: { groupId: string } }
 ) {
   await dbConnect();
-  const { groupId } = context.params;
+  const { groupId } = params;
 
   try {
     const token = req.cookies.get('token')?.value;
     if (!token) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
+
     const decoded = verifyToken(token);
     const userId = decoded.userId;
 
@@ -29,7 +24,7 @@ export async function POST(
       { _id: groupId },
       { $addToSet: { members: userId } }
     );
-    
+
     await User.updateOne(
       { _id: userId },
       { $addToSet: { groups: groupId } }
