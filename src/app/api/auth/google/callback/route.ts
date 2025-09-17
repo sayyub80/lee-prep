@@ -40,31 +40,44 @@ export async function GET(request: Request) {
 
   await dbConnect();
   let user = await User.findOne({ email: profile.email });
-  if (!user) {
-    // --- FIX: Create a fallback name if one isn't provided by Google ---
-    const userName = profile.name || profile.email.split('@')[0];
 
+  if (!user) {
+    const userName = profile.name || profile.email.split('@')[0];
+    let referrerId = null;
+
+    // Create a user instance
     user = new User({
-      name: userName, // Use the new fallback name
+      name: userName,
       email: profile.email,
       avatar: profile.picture,
-      password: Math.random().toString(36), // random password, not used
+      password: Math.random().toString(36),
     });
 
-    // Handle referral
+    // Check for a valid referrer before saving
     if (referralCode) {
       const referrer = await User.findOne({ referralCode });
       if (referrer) {
         user.referredBy = referrer._id;
-        referrer.credits += 10;
-        await referrer.save();
+        referrerId = referrer._id;
       }
     }
 
+    // Save the new user to get their _id
     await user.save();
+
+    // If a referrer was found, update their record
+    if (referrerId) {
+      await User.updateOne(
+        { _id: referrerId },
+        {
+          $inc: { credits: 10 },
+          $push: { referrals: user._id }
+        }
+      );
+    }
   }
 
-  const token = generateToken({ userId: user._id });
+  const token = generateToken({ userId: user._id, role: user.role });
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
   const response = NextResponse.redirect(`${baseUrl}/dashboard`);
@@ -75,7 +88,7 @@ export async function GET(request: Request) {
     path: '/',
     maxAge: 60 * 60 * 24 * 7,
   });
-  response.cookies.set('google_referral_code', '', { maxAge: 0, path: '/' }); 
+  response.cookies.set('google_referral_code', '', { maxAge: 0, path: '/' });
 
   return response;
 }

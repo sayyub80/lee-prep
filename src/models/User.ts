@@ -16,6 +16,7 @@ interface IUser extends Document {
   credits: number;
   referralCode: string;
   referredBy?: Schema.Types.ObjectId;
+  referrals: Schema.Types.ObjectId[]; 
   streak: number;
   isAccecptedTerm:{
     type:boolean,
@@ -33,8 +34,8 @@ interface IUser extends Document {
     default: 'beginner'
   },
    achievements: string[];
-  groups: Schema.Types.ObjectId[]; // <-- ADD THIS LINE
-  role: 'user' | 'admin'; // <-- ADD THIS LINE
+  groups: Schema.Types.ObjectId[]; 
+  role: 'user' | 'admin'; 
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
@@ -51,6 +52,7 @@ const UserSchema = new Schema<IUser>({
   credits: { type: Number, default: 0 },
   referralCode: { type: String, unique: true },
   referredBy: { type: Schema.Types.ObjectId, ref: 'User' },
+  referrals: [{ type: Schema.Types.ObjectId, ref: 'User' }], 
   streak: { type: Number, default: 0 },
   dailyProgress: {
     completed: { type: Number, default: 0 },

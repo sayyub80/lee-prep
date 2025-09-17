@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import User from '@/models/User';
-import  dbConnect  from '@/lib/db';
+import dbConnect from '@/lib/db';
 import { generateToken } from '@/lib/jwt';
 
 export async function POST(request: Request) {
@@ -9,50 +9,48 @@ export async function POST(request: Request) {
   try {
     const { name, email, password, confirmPassword, referralCode } = await request.json();
 
-    // Validation
     if (!name || !email || !password || !confirmPassword) {
-      return NextResponse.json(
-        { success: false, error: 'All fields are required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: 'All fields are required' }, { status: 400 });
     }
-
     if (password !== confirmPassword) {
-      return NextResponse.json(
-        { success: false, error: 'Passwords do not match' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: 'Passwords do not match' }, { status: 400 });
     }
-
-    // Check existing user
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return NextResponse.json(
-        { success: false, error: 'Email already in use' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: 'Email already in use' }, { status: 400 });
     }
 
-    // Create user
+    // Create user instance
     const user = new User({ name, email, password });
+    let referrerId = null;
 
-    // Handle referral
+    // Check for a valid referrer before saving the new user
     if (referralCode) {
       const referrer = await User.findOne({ referralCode });
       if (referrer) {
         user.referredBy = referrer._id;
-        referrer.credits += 10;
-        await referrer.save();
+        referrerId = referrer._id;
       }
     }
 
+    // Save the new user so they get an _id
     await user.save();
 
-
+    // If a valid referrer was found, update their credits and referrals list
+    if (referrerId) {
+      await User.updateOne(
+        { _id: referrerId },
+        {
+          $inc: { credits: 10 },
+          $push: { referrals: user._id }
+        }
+      );
+    }
+    
     // Generate token
-    const token = generateToken({ userId: user._id.toString() });
+    const token = generateToken({ userId: user._id.toString(), role: user.role });
 
-    const response= NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       token,
       user: {
@@ -60,24 +58,22 @@ export async function POST(request: Request) {
         name: user.name,
         email: user.email,
         credits: user.credits,
-        referralCode: user.referralCode
+        referralCode: user.referralCode,
+        role: user.role
       }
     }, { status: 201 });
-     // Set HTTP-only cookie
+
     response.cookies.set('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 60 * 60 * 24 * 7, // 1 week
+      maxAge: 60 * 60 * 24 * 7, 
       path: '/',
     });
 
- return response;
+    return response;
   } catch (error: any) {
     console.error('Signup error:', error);
-    return NextResponse.json(
-      { success: false, error: error.message || 'Server Error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: error.message || 'Server Error' }, { status: 500 });
   }
 }
