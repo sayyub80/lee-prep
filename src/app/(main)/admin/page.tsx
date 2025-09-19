@@ -1,132 +1,92 @@
-// src/app/(main)/admin/page.tsx
 'use client';
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/context/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Shield, Loader2, MessageSquare, PenSquare } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // You may need to add this: npx shadcn-ui@latest add select
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Users, Crown, MessageSquare, Trophy, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-interface Group { _id: string; name: string; }
+interface AdminStats {
+  totalUsers: number;
+  subscribedUsers: number;
+  totalGroups: number;
+  totalSubmissions: number;
+}
 
-export default function AdminPage() {
-  const { user, loading: authLoading } = useAuth();
-  // State for creating groups
-  const [groupName, setGroupName] = useState('');
-  const [groupDesc, setGroupDesc] = useState('');
-  const [groupTopic, setGroupTopic] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
-  const [createFeedback, setCreateFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+// --- MODIFIED StatCard component to accept colors ---
+const StatCard = ({ title, value, icon: Icon, iconColor, bgColor }: { title: string; value: string | number; icon: React.ElementType, iconColor: string, bgColor: string }) => (
+  <Card className={cn("transition-transform hover:scale-[1.02] hover:shadow-md", bgColor)}>
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardTitle className="text-sm font-medium text-gray-800">{title}</CardTitle>
+      <Icon className={cn("h-5 w-5", iconColor)} />
+    </CardHeader>
+    <CardContent>
+      <div className="text-3xl font-bold text-gray-900">{value}</div>
+    </CardContent>
+  </Card>
+);
 
-  // State for setting topics
-  const [allGroups, setAllGroups] = useState<Group[]>([]);
-  const [selectedGroupId, setSelectedGroupId] = useState('');
-  const [newTopic, setNewTopic] = useState('');
-  const [isSettingTopic, setIsSettingTopic] = useState(false);
-  const [topicFeedback, setTopicFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+export default function AdminDashboardPage() {
+  const [stats, setStats] = useState<AdminStats | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch all groups to populate the dropdown
-    const fetchGroups = async () => {
-        try {
-            const res = await fetch('/api/groups');
-            const data = await res.json();
-            if(data.success) setAllGroups(data.data);
-        } catch (error) {
-            console.error("Failed to fetch groups for admin panel", error);
-        }
-    }
-    if(user?.role === 'admin') fetchGroups();
-  }, [user]);
-
-  const handleCreateGroup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsCreating(true);
-    setCreateFeedback(null);
-    try {
-      const res = await fetch('/api/admin/groups', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: groupName, description: groupDesc, topic: groupTopic }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to create group');
-      setCreateFeedback({ type: 'success', message: `Successfully created: "${data.data.name}"` });
-      setGroupName(''); setGroupDesc(''); setGroupTopic('');
-      setAllGroups(prev => [...prev, data.data]); // Add new group to dropdown
-    } catch (error: any) {
-      setCreateFeedback({ type: 'error', message: error.message });
-    } finally {
-      setIsCreating(false);
-    }
-  };
-  
-  const handleSetTopic = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if(!selectedGroupId || !newTopic) return;
-    setIsSettingTopic(true);
-    setTopicFeedback(null);
-    try {
-        const res = await fetch(`/api/admin/groups/${selectedGroupId}/topic`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: newTopic }),
-        });
+    const fetchStats = async () => {
+      try {
+        const res = await fetch('/api/admin/stats');
         const data = await res.json();
-        if(!res.ok) throw new Error(data.error || 'Failed to set topic');
-        setTopicFeedback({ type: 'success', message: 'Topic updated successfully!'});
-        setNewTopic('');
-    } catch (error: any) {
-        setTopicFeedback({ type: 'error', message: error.message });
-    } finally {
-        setIsSettingTopic(false);
-    }
-  };
+        if (data.success) {
+          setStats(data.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch admin stats:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStats();
+  }, []);
 
-  if (authLoading) return <div className="flex justify-center items-center h-screen"><Loader2 className="w-12 h-12 animate-spin text-primary"/></div>;
-  if (user?.role !== 'admin') return <div className="container py-12 text-center"><h1 className="text-3xl font-bold text-destructive">Access Denied</h1><p className="text-muted-foreground mt-2">You do not have permission to view this page.</p></div>;
+  if (loading) {
+    return <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  }
 
   return (
-    <div className="px-8 py-8">
-      <header className="mb-8"><h1 className="text-3xl font-bold tracking-tight flex items-center gap-3"><Shield /> Admin Panel</h1><p className="text-muted-foreground mt-1">Manage application content and features.</p></header>
-      <main className="grid md:grid-cols-2 gap-8">
-        {/* Create Group Card */}
-        <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><PenSquare/> Create New Group</CardTitle><CardDescription>This group will be visible to all users on the community page.</CardDescription></CardHeader>
-          <CardContent>
-            <form onSubmit={handleCreateGroup} className="space-y-6">
-              <div className="space-y-2"><label htmlFor="groupName" className="font-medium">Group Name</label><Input id="groupName" value={groupName} onChange={(e) => setGroupName(e.target.value)} required /></div>
-              <div className="space-y-2"><label htmlFor="groupDesc" className="font-medium">Description</label><Textarea id="groupDesc" value={groupDesc} onChange={(e) => setGroupDesc(e.target.value)} required /></div>
-              <div className="space-y-2"><label htmlFor="groupTopic" className="font-medium">Topic</label><Input id="groupTopic" value={groupTopic} onChange={(e) => setGroupTopic(e.target.value)} /></div>
-              {createFeedback && <div className={`p-3 rounded-md text-sm ${createFeedback.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{createFeedback.message}</div>}
-              <Button type="submit" disabled={isCreating} className="w-full">{isCreating ? <Loader2 className="w-4 h-4 animate-spin"/> : 'Create Group'}</Button>
-            </form>
-          </CardContent>
-        </Card>
-        {/* Set Topic Card */}
-        <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><MessageSquare/> Set Group Topic</CardTitle><CardDescription>Set the daily or weekly discussion topic for a group.</CardDescription></CardHeader>
-          <CardContent>
-             <form onSubmit={handleSetTopic} className="space-y-6">
-                <div className="space-y-2">
-                    <label htmlFor="groupSelect" className="font-medium">Select Group</label>
-                    <Select onValueChange={setSelectedGroupId} value={selectedGroupId}>
-                        <SelectTrigger><SelectValue placeholder="Choose a group..." /></SelectTrigger>
-                        <SelectContent>{allGroups.map(g => <SelectItem key={g._id} value={g._id}>{g.name}</SelectItem>)}</SelectContent>
-                    </Select>
-                </div>
-                <div className="space-y-2">
-                    <label htmlFor="newTopic" className="font-medium">New Topic Title</label>
-                    <Input id="newTopic" value={newTopic} onChange={(e) => setNewTopic(e.target.value)} placeholder="e.g., 'Discuss the movie Inception'" required />
-                </div>
-                {topicFeedback && <div className={`p-3 rounded-md text-sm ${topicFeedback.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{topicFeedback.message}</div>}
-                <Button type="submit" disabled={isSettingTopic || !selectedGroupId} className="w-full">{isSettingTopic ? <Loader2 className="w-4 h-4 animate-spin"/> : 'Set Topic'}</Button>
-             </form>
-          </CardContent>
-        </Card>
-      </main>
+    <div>
+      <h1 className="text-3xl font-bold mb-2">Admin Dashboard</h1>
+      <p className="text-muted-foreground mb-6">An overview of your application's activity and growth.</p>
+      
+      {/* --- UPDATED StatCard calls with color props --- */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <StatCard 
+          title="Total Users" 
+          value={stats?.totalUsers ?? 0} 
+          icon={Users}
+          iconColor="text-blue-600"
+          bgColor="bg-gradient-to-br from-blue-100 to-blue-50"
+        />
+        <StatCard 
+          title="Subscribed Users" 
+          value={stats?.subscribedUsers ?? 0} 
+          icon={Crown}
+          iconColor="text-amber-600"
+          bgColor="bg-gradient-to-br from-amber-100 to-amber-50"
+        />
+        <StatCard 
+          title="Total Groups" 
+          value={stats?.totalGroups ?? 0} 
+          icon={MessageSquare}
+          iconColor="text-indigo-600"
+          bgColor="bg-gradient-to-br from-indigo-100 to-indigo-50"
+        />
+        <StatCard 
+          title="Challenge Submissions" 
+          value={stats?.totalSubmissions ?? 0} 
+          icon={Trophy}
+          iconColor="text-green-600"
+          bgColor="bg-gradient-to-br from-green-100 to-green-50"
+        />
+      </div>
+      
+      {/* You can add charts or recent activity here in the future */}
     </div>
   );
 }

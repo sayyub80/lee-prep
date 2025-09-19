@@ -2,37 +2,13 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import io, { Socket } from 'socket.io-client';
-import { Users, Search, Loader2 } from "lucide-react";
+// --- ICONS ADDED HERE ---
+import { Users, Search, Loader2, Film, Cpu, Bot, Globe, BookOpen, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useAuth } from "@/context/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-
-// --- NEW COMPONENT TO HANDLE IMAGE ERRORS ---
-const UserAvatar = ({ src, name, className }: { src?: string, name?: string, className?: string }) => {
-  const [hasError, setHasError] = useState(false);
-
-  const fallbackChar = name?.trim().charAt(0).toUpperCase() || '?';
-
-  useEffect(() => {
-    setHasError(false); // Reset error state when src changes
-  }, [src]);
-
-  return (
-    <Avatar className={className}>
-      {src && !hasError ? (
-        <AvatarImage 
-          src={src} 
-          alt={name || 'User Avatar'} 
-          onError={() => setHasError(true)}
-        />
-      ) : null}
-      <AvatarFallback>{fallbackChar}</AvatarFallback>
-    </Avatar>
-  );
-};
-
 
 interface Group {
     _id: string;
@@ -44,12 +20,25 @@ interface Group {
     onlineUsers: { id: string, name: string, avatar?: string }[];
 }
 
+// --- UPDATED HELPER FUNCTION ---
+const getGroupIcon = (groupName: string) => {
+    const name = groupName.toLowerCase();
+    if (name.includes('cinema') || name.includes('movie')) return <Film className="h-6 w-6 text-red-500" />;
+    if (name.includes('tech')) return <Cpu className="h-6 w-6 text-sky-500" />;
+    if (name.includes('ai')) return <Bot className="h-6 w-6 text-indigo-500" />;
+    if (name.includes('travel') || name.includes('culture')) return <Globe className="h-6 w-6 text-green-500" />;
+    if (name.includes('book') || name.includes('reading')) return <BookOpen className="h-6 w-6 text-orange-500" />;
+    if (name.includes('business') || name.includes('career') || name.includes('interview')) return <Briefcase className="h-6 w-6 text-purple-500" />;
+    // Default icon if no keywords match
+    return <Users className="h-6 w-6 text-gray-500" />;
+};
+
+
 export default function GroupsLobbyPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
-  // ... (rest of the component logic remains the same) ...
   const [joiningGroupId, setJoiningGroupId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const socketRef = useRef<Socket | null>(null);
@@ -113,7 +102,7 @@ export default function GroupsLobbyPage() {
     g.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     g.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
+  
   const isUserMember = (group: Group) => user ? group.members.some(m => m._id === user.id) : false;
 
   const SkeletonCard = () => (
@@ -138,7 +127,7 @@ export default function GroupsLobbyPage() {
 
   return (
     <div className="bg-secondary/30 min-h-[calc(100vh-80px)]">
-        <div className="px-25 py-15l">
+        <div className="px-25 py-11">
             <header className="flex flex-col md:flex-row justify-between items-start gap-4 mb-8">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3"><Users/> Group Discussions</h1>
@@ -149,8 +138,8 @@ export default function GroupsLobbyPage() {
                     <Input type="search" placeholder="Search groups..." className="pl-8" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
             </header>
+
             <main className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* --- RENDER LOGIC --- */}
               {loading ? (
                   <>
                       <SkeletonCard /><SkeletonCard /><SkeletonCard />
@@ -158,40 +147,33 @@ export default function GroupsLobbyPage() {
               ) : (
                 <>
                 {filteredGroups.length > 0 ? filteredGroups.map((group) => (
-                    <Card key={group._id} className="hover:shadow-xl transition-shadow flex flex-col bg-card">
-                        <CardHeader>
-                            <div className="flex justify-between items-start">
-                                <CardTitle className="text-lg">{group.name}</CardTitle>
-                                {group.onlineCount > 0 && (
-                                    <div className="flex items-center text-xs font-semibold text-green-600 bg-green-100 px-2 py-1 rounded-full">
-                                        <span className="relative flex h-2 w-2 mr-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span></span>
-                                        {group.onlineCount} Online
-                                    </div>
-                                )}
+                    <Card key={group._id} className="group hover:shadow-xl hover:-translate-y-1 transition-all flex flex-col bg-card">
+                        <CardHeader className="flex flex-row items-start gap-4">
+                            <div className="bg-secondary p-3 rounded-lg mt-1">
+                                {getGroupIcon(group.name)}
                             </div>
-                            <CardDescription className="pt-2">{group.description}</CardDescription>
+                            <div>
+                                <CardTitle className="text-lg">{group.name}</CardTitle>
+                                <CardDescription className="pt-1 line-clamp-2">{group.description}</CardDescription>
+                            </div>
                         </CardHeader>
                         <CardContent className="flex-grow">
                             <p className="text-xs font-semibold text-muted-foreground mb-2">ONLINE NOW</p>
                             <div className="flex -space-x-2 overflow-hidden h-8">
                                 {(group.onlineUsers && group.onlineUsers.length > 0) ? group.onlineUsers.slice(0, 5).map((onlineUser) => (
-                                  // --- USE THE NEW COMPONENT HERE ---
-                                  <UserAvatar 
-                                    key={onlineUser.id}
-                                    src={onlineUser.avatar} 
-                                    name={onlineUser.name} 
-                                    className="w-8 h-8 border-2 border-background"
-                                  />
+                                    <Avatar key={onlineUser.id} className="w-8 h-8 border-2 border-background">
+                                        {onlineUser.avatar ? <AvatarImage src={onlineUser.avatar} /> : <AvatarFallback>{onlineUser.name?.trim().charAt(0).toUpperCase() || '?'}</AvatarFallback>}
+                                    </Avatar>
                                 )) : <span className="text-xs text-muted-foreground italic">No one online right now.</span>}
                                 {group.onlineUsers && group.onlineUsers.length > 5 && (
-                                    <Avatar className="w-8 h-8 border-2 border-background">
+                                     <Avatar className="w-8 h-8 border-2 border-background">
                                         <AvatarFallback>+{group.onlineUsers.length - 5}</AvatarFallback>
-                                    </Avatar>
+                                     </Avatar>
                                 )}
                             </div>
                         </CardContent>
-                        <CardFooter className="flex justify-between items-center">
-                            <span className="text-sm text-muted-foreground">{group.members.length} total members</span>
+                        <CardFooter className="flex justify-between items-center border-t pt-4">
+                             <div className="text-sm font-medium text-muted-foreground">{group.members.length} total members</div>
                             <Button onClick={() => handleJoinGroup(group._id)} disabled={joiningGroupId === group._id} variant={isUserMember(group) ? "secondary" : "default"}>
                                 {joiningGroupId === group._id ? <Loader2 className="w-4 h-4 animate-spin"/> : (isUserMember(group) ? "Enter Chat" : "Join Group")}
                             </Button>

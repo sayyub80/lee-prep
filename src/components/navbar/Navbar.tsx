@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Menu, X, Globe, Mic, BookOpen, Users, Crown, LayoutDashboard, User, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
+import { cn } from '@/lib/utils';
 
 const Navbar = () => {
   const router = useRouter();
@@ -35,10 +36,10 @@ const Navbar = () => {
   };
 
   const menuItems = [
-    { name: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard className="w-4 h-4 mr-2" /> },
-    { name: 'Practice', path: '/practice', icon: <Mic className="w-4 h-4 mr-2" /> },
-    { name: 'Courses', path: '/courses', icon: <BookOpen className="w-4 h-4 mr-2" /> },
-    { name: 'Community', path: '/community', icon: <Users className="w-4 h-4 mr-2" /> },
+    { name: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard className="w-4 h-4 mr-2 text-sky-500" /> },
+    { name: 'Practice', path: '/practice', icon: <Mic className="w-4 h-4 mr-2 text-indigo-500" /> },
+    { name: 'Courses', path: '/courses', icon: <BookOpen className="w-4 h-4 mr-2 text-rose-500" /> },
+    { name: 'Community', path: '/community', icon: <Users className="w-4 h-4 mr-2 text-emerald-500" /> },
   ];
 
   return (
@@ -53,12 +54,11 @@ const Navbar = () => {
         <nav className="hidden md:flex items-center space-x-6">
           {user?.role === 'admin' && (
             <Link href="/admin" className="flex items-center text-primary hover:text-primary/80 transition-colors font-semibold">
-                <Shield className="w-4 h-4 mr-2" />
+                <Shield className="w-4 h-4 mr-2 text-primary" />
                 Admin Panel
             </Link>
           )}
 
-          {/* This logic now filters out 'Dashboard' for admins */}
           {menuItems
             .filter(item => user?.role !== 'admin' || item.name !== 'Dashboard')
             .map((item) => (
@@ -73,6 +73,7 @@ const Navbar = () => {
           ))}
         </nav>
 
+        {/* ... (rest of the component remains the same) ... */}
         <div className="hidden md:flex items-center space-x-4">
           {user ? (
             <>
@@ -152,7 +153,6 @@ const Navbar = () => {
                       Admin Panel
                   </Link>
               )}
-              {/* This logic now filters out 'Dashboard' for admins in the mobile menu */}
               {menuItems
                 .filter(item => user?.role !== 'admin' || item.name !== 'Dashboard')
                 .map((item) => (
