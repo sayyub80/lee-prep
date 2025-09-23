@@ -1,5 +1,3 @@
-// src/app/api/auth/login/route.ts
-
 import { NextResponse } from 'next/server';
 import User from '@/models/User';
 import dbConnect from '@/lib/db';
@@ -25,11 +23,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Invalid credentials' }, { status: 401 });
     }
 
-    // --- MODIFICATION START ---
-    // Add the user's role to the token payload
-    const tokenPayload = { userId: user._id.toString(), role: user.role };
+    // Block login if user is suspended
+    if (user.status === 'suspended') {
+      return NextResponse.json({ success: false, error: 'Your account has been suspended.' }, { status: 403 });
+    }
+
+    // Automatically update older accounts that might not have a status
+    if (!user.status) {
+      user.status = 'active';
+      await user.save();
+    }
+
+    // --- FIX: Add user.status to the token payload ---
+    const tokenPayload = { userId: user._id.toString(), role: user.role, status: user.status };
     const token = generateToken(tokenPayload);
-    // --- MODIFICATION END ---
 
     const userData = {
       id: user._id,
@@ -37,7 +44,7 @@ export async function POST(request: Request) {
       email: user.email,
       credits: user.credits,
       referralCode: user.referralCode,
-      role: user.role, // Also good to send the role to the frontend
+      role: user.role,
     };
 
     const response = NextResponse.json({ success: true, token, user: userData });

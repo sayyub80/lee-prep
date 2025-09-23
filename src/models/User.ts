@@ -36,6 +36,7 @@ interface IUser extends Document {
    achievements: string[];
   groups: Schema.Types.ObjectId[]; 
   role: 'user' | 'admin'; 
+   status: 'active' | 'suspended';
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
@@ -62,7 +63,8 @@ const UserSchema = new Schema<IUser>({
   accuracy: { type: Number, default: 0 },
    achievements: { type: [String], default: [] },
   groups: [{ type: Schema.Types.ObjectId, ref: 'Group' }],
-  role: { type: String, enum: ['user', 'admin'], default: 'user' } 
+  role: { type: String, enum: ['user', 'admin'], default: 'user' } ,
+  status: { type: String, enum: ['active', 'suspended'], default: 'active' }
 }, { timestamps: true });
 
 UserSchema.pre('save', async function(next) {

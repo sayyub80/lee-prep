@@ -7,8 +7,7 @@ import { cookies } from 'next/headers';
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
-
-  const cookieStore = await cookies();
+  const cookieStore = cookies();
   const referralCode = cookieStore.get('google_referral_code')?.value;
 
   if (!code) {
@@ -16,6 +15,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${baseUrl}/login?error=google_oauth_failed`);
   }
 
+  // Exchange code for tokens
   const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -27,12 +27,15 @@ export async function GET(request: Request) {
       grant_type: 'authorization_code',
     }),
   });
-  const tokenData = await tokenRes.json();
-  if (!tokenData.access_token) {
+  
+  if (!tokenRes.ok) {
+    console.error("Google Token Exchange Failed:", await tokenRes.text());
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-    return NextResponse.redirect(`${baseUrl}/login?error=google_oauth_failed`);
+    return NextResponse.redirect(`${baseUrl}/login?error=google_token_exchange_failed`);
   }
-
+  const tokenData = await tokenRes.json();
+  
+  // Fetch user info
   const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
     headers: { Authorization: `Bearer ${tokenData.access_token}` },
   });
@@ -45,7 +48,6 @@ export async function GET(request: Request) {
     const userName = profile.name || profile.email.split('@')[0];
     let referrerId = null;
 
-    // Create a user instance
     user = new User({
       name: userName,
       email: profile.email,
@@ -53,7 +55,6 @@ export async function GET(request: Request) {
       password: Math.random().toString(36),
     });
 
-    // Check for a valid referrer before saving
     if (referralCode) {
       const referrer = await User.findOne({ referralCode });
       if (referrer) {
@@ -62,8 +63,7 @@ export async function GET(request: Request) {
       }
     }
 
-    // Save the new user to get their _id
-    await user.save();
+    await user.save(); // Save the new user
 
     // If a referrer was found, update their record
     if (referrerId) {
@@ -76,8 +76,13 @@ export async function GET(request: Request) {
       );
     }
   }
+  
+  if (!user.status) {
+      user.status = 'active';
+      await user.save();
+  }
 
-  const token = generateToken({ userId: user._id, role: user.role });
+  const token = generateToken({ userId: user._id, role: user.role, status: user.status });
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
   const response = NextResponse.redirect(`${baseUrl}/dashboard`);

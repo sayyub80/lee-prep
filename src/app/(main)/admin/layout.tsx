@@ -5,15 +5,15 @@ import {
   LayoutDashboard,
   MessageSquare,
   Zap,
-  Shield,
-  Settings,
+  Users,
+  UserPlus,
   LogOut,
+  Shield
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 
-// Define the navigation items with sections
 const navSections = [
   {
     title: 'Overview',
@@ -26,6 +26,13 @@ const navSections = [
     items: [
       { href: '/admin/groups', label: 'Manage Groups', icon: MessageSquare, color: 'text-indigo-500' },
       { href: '/admin/challenges', label: 'Manage Challenges', icon: Zap, color: 'text-amber-500' },
+    ]
+  },
+  {
+    title: 'User Management',
+    items: [
+        { href: '/admin/users', label: 'All Users', icon: Users, color: 'text-green-500' },
+        { href: '/admin/add-admin', label: 'Add Admin', icon: UserPlus, color: 'text-red-500' },
     ]
   }
 ];
@@ -40,7 +47,6 @@ export default function AdminLayout({
 
   return (
     <div className="min-h-[calc(100vh-80px)] flex">
-      {/* --- NEW Full-Height Sidebar --- */}
       <aside className="w-64 flex-shrink-0 border-r bg-muted/40 hidden lg:flex flex-col">
         <div className="flex-grow p-4">
           <nav className="flex flex-col space-y-1">
@@ -66,7 +72,6 @@ export default function AdminLayout({
             ))}
           </nav>
         </div>
-        {/* --- NEW User Profile Section at the Bottom --- */}
         <div className="p-4 border-t">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -86,8 +91,8 @@ export default function AdminLayout({
         </div>
       </aside>
 
-      {/* --- Main Content Area --- */}
-      <main className="flex-1 p-6 lg:p-8 overflow-y-auto">
+      {/* --- MODIFICATION: Added more padding for a better look --- */}
+      <main className="flex-1 p-8 lg:p-10 overflow-y-auto">
         {children}
       </main>
     </div>

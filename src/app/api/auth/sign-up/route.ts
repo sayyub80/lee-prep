@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import User from '@/models/User';
-import dbConnect from '@/lib/db';
+import  dbConnect  from '@/lib/db';
 import { generateToken } from '@/lib/jwt';
 
 export async function POST(request: Request) {
@@ -20,35 +20,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Email already in use' }, { status: 400 });
     }
 
-    // Create user instance
     const user = new User({ name, email, password });
-    let referrerId = null;
 
-    // Check for a valid referrer before saving the new user
     if (referralCode) {
       const referrer = await User.findOne({ referralCode });
       if (referrer) {
         user.referredBy = referrer._id;
-        referrerId = referrer._id;
+        // This should be an atomic operation, but for simplicity:
+        referrer.credits += 10;
+        referrer.referrals.push(user._id);
+        await referrer.save();
       }
     }
 
-    // Save the new user so they get an _id
     await user.save();
-
-    // If a valid referrer was found, update their credits and referrals list
-    if (referrerId) {
-      await User.updateOne(
-        { _id: referrerId },
-        {
-          $inc: { credits: 10 },
-          $push: { referrals: user._id }
-        }
-      );
-    }
     
-    // Generate token
-    const token = generateToken({ userId: user._id.toString(), role: user.role });
+    // --- FIX: Add user.status (which defaults to 'active') to the token payload ---
+    const token = generateToken({ userId: user._id.toString(), role: user.role, status: user.status });
 
     const response = NextResponse.json({
       success: true,
@@ -58,8 +46,7 @@ export async function POST(request: Request) {
         name: user.name,
         email: user.email,
         credits: user.credits,
-        referralCode: user.referralCode,
-        role: user.role
+        referralCode: user.referralCode
       }
     }, { status: 201 });
 
@@ -67,7 +54,7 @@ export async function POST(request: Request) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 60 * 60 * 24 * 7, 
+      maxAge: 60 * 60 * 24 * 7,
       path: '/',
     });
 
