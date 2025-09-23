@@ -3,11 +3,11 @@ import User from '@/models/User';
 import dbConnect from '@/lib/db';
 import { verifyToken } from '@/lib/jwt';
 
-export async function POST(request: NextRequest) { // <-- Use NextRequest
+export async function POST(request: NextRequest) { 
   await dbConnect();
 
   try {
-    // --- FIX: Read the token from cookies, not headers ---
+   
     const token = request.cookies.get('token')?.value;
     if (!token) {
         return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });

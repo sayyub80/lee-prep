@@ -1,132 +1,130 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, MessageSquare, PenSquare } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { MoreHorizontal, Loader2, PlusCircle, Trash2, Edit } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
-interface Group { _id: string; name: string; }
+// --- NEW: Skeleton component for the shimmer effect ---
+const SkeletonRow = () => (
+    <TableRow>
+        <TableCell><div className="h-5 bg-secondary rounded animate-pulse w-3/4"></div></TableCell>
+        <TableCell><div className="h-5 bg-secondary rounded animate-pulse w-full"></div></TableCell>
+        <TableCell><div className="h-5 bg-secondary rounded animate-pulse w-1/2"></div></TableCell>
+        <TableCell className="text-right"><div className="h-8 w-8 bg-secondary rounded-md animate-pulse ml-auto"></div></TableCell>
+    </TableRow>
+);
+
 
 export default function ManageGroupsPage() {
-  const { user } = useAuth();
-  const [groupName, setGroupName] = useState('');
-  const [groupDesc, setGroupDesc] = useState('');
-  const [groupTopic, setGroupTopic] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
-  const [createFeedback, setCreateFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+    const [groups, setGroups] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const router = useRouter();
 
-  const [allGroups, setAllGroups] = useState<Group[]>([]);
-  const [selectedGroupId, setSelectedGroupId] = useState('');
-  const [newTopic, setNewTopic] = useState('');
-  const [isSettingTopic, setIsSettingTopic] = useState(false);
-  const [topicFeedback, setTopicFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-
-  useEffect(() => {
-    const fetchGroups = async () => {
+    const fetchGroups = useCallback(async () => {
+        setLoading(true);
         try {
             const res = await fetch('/api/groups');
             const data = await res.json();
-            if(data.success) setAllGroups(data.data);
+            if (data.success) setGroups(data.data);
         } catch (error) {
-            console.error("Failed to fetch groups for admin panel", error);
+            console.error('Failed to fetch groups:', error);
+        } finally {
+            setLoading(false);
         }
-    }
-    if(user?.role === 'admin') fetchGroups();
-  }, [user]);
+    }, []);
 
-  const handleCreateGroup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsCreating(true);
-    setCreateFeedback(null);
-    try {
-      const res = await fetch('/api/admin/groups', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: groupName, description: groupDesc, topic: groupTopic }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to create group');
-      setCreateFeedback({ type: 'success', message: `Successfully created: "${data.data.name}"` });
-      setGroupName(''); setGroupDesc(''); setGroupTopic('');
-      setAllGroups(prev => [...prev, data.data]);
-    } catch (error: any) {
-      setCreateFeedback({ type: 'error', message: error.message });
-    } finally {
-      setIsCreating(false);
-    }
-  };
-  
-  const handleSetTopic = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if(!selectedGroupId || !newTopic) return;
-    setIsSettingTopic(true);
-    setTopicFeedback(null);
-    try {
-        const res = await fetch(`/api/groups/${selectedGroupId}/topic`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: newTopic }),
-        });
-        const data = await res.json();
-        if(!res.ok) throw new Error(data.error || 'Failed to set topic');
-        setTopicFeedback({ type: 'success', message: 'Topic updated successfully!'});
-        setNewTopic('');
-    } catch (error: any) {
-        setTopicFeedback({ type: 'error', message: error.message });
-    } finally {
-        setIsSettingTopic(false);
-    }
-  };
+    useEffect(() => {
+        fetchGroups();
+    }, [fetchGroups]);
 
-  return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Manage Groups</h1>
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            {/* --- ICON COLOR ADDED --- */}
-            <CardTitle className="flex items-center gap-2"><PenSquare className="text-green-500"/> Create New Group</CardTitle>
-            <CardDescription>This group will be visible to all users.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleCreateGroup} className="space-y-4">
-              <div className="space-y-2"><label htmlFor="groupName" className="font-medium">Group Name</label><Input id="groupName" value={groupName} onChange={(e) => setGroupName(e.target.value)} required /></div>
-              <div className="space-y-2"><label htmlFor="groupDesc" className="font-medium">Description</label><Textarea id="groupDesc" value={groupDesc} onChange={(e) => setGroupDesc(e.target.value)} required /></div>
-              <div className="space-y-2"><label htmlFor="groupTopic" className="font-medium">Topic</label><Input id="groupTopic" value={groupTopic} onChange={(e) => setGroupTopic(e.target.value)} placeholder="e.g., Movies, Technology" /></div>
-              {createFeedback && <div className={`p-3 rounded-md text-sm ${createFeedback.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{createFeedback.message}</div>}
-              <Button type="submit" disabled={isCreating} className="w-full">{isCreating ? <Loader2 className="w-4 h-4 animate-spin"/> : 'Create Group'}</Button>
-            </form>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader>
-            {/* --- ICON COLOR ADDED --- */}
-            <CardTitle className="flex items-center gap-2"><MessageSquare className="text-indigo-500"/> Set Group Topic</CardTitle>
-            <CardDescription>Set the daily discussion topic for a group.</CardDescription>
-          </CardHeader>
-          <CardContent>
-             <form onSubmit={handleSetTopic} className="space-y-4">
-                <div className="space-y-2">
-                    <label htmlFor="groupSelect" className="font-medium">Select Group</label>
-                    <Select onValueChange={setSelectedGroupId} value={selectedGroupId}>
-                        <SelectTrigger><SelectValue placeholder="Choose a group..." /></SelectTrigger>
-                        <SelectContent>{allGroups.map(g => <SelectItem key={g._id} value={g._id}>{g.name}</SelectItem>)}</SelectContent>
-                    </Select>
+    const handleDelete = async (groupId: string) => {
+        try {
+            await fetch(`/api/admin/groups/${groupId}`, { method: 'DELETE' });
+            fetchGroups(); // Refresh the list
+        } catch (error) {
+            console.error('Failed to delete group:', error);
+        }
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="flex justify-between items-center">
+                <div>
+                    <h1 className="text-2xl font-bold">Manage Groups</h1>
+                    <p className="text-muted-foreground">Create, edit, and delete user groups.</p>
                 </div>
-                <div className="space-y-2">
-                    <label htmlFor="newTopic" className="font-medium">New Topic Title</label>
-                    <Input id="newTopic" value={newTopic} onChange={(e) => setNewTopic(e.target.value)} placeholder="e.g., 'Discuss the movie Inception'" required />
-                </div>
-                {topicFeedback && <div className={`p-3 rounded-md text-sm ${topicFeedback.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{topicFeedback.message}</div>}
-                <Button type="submit" disabled={isSettingTopic || !selectedGroupId} className="w-full">{isSettingTopic ? <Loader2 className="w-4 h-4 animate-spin"/> : 'Set Topic'}</Button>
-             </form>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
+                <Button onClick={() => router.push('/admin/groups/create')}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Create New Group
+                </Button>
+            </div>
+            <Card className='p-3'>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Description</TableHead>
+                            <TableHead>Members</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {/* --- MODIFICATION: Show skeleton rows while loading --- */}
+                        {loading ? (
+                            <>
+                                <SkeletonRow />
+                                <SkeletonRow />
+                                <SkeletonRow />
+                            </>
+                        ) : (
+                            groups.map((group) => (
+                                <TableRow key={group._id}>
+                                    <TableCell className="font-medium">{group.name}</TableCell>
+                                    <TableCell className="text-muted-foreground max-w-sm truncate">{group.description}</TableCell>
+                                    <TableCell>{group.members.length}</TableCell>
+                                    <TableCell className="text-right">
+                                        <AlertDialog>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onSelect={() => router.push(`/admin/groups/edit/${group._id}`)}>
+                                                        <Edit className="mr-2 h-4 w-4" /> Edit
+                                                    </DropdownMenuItem>
+                                                    <AlertDialogTrigger asChild>
+                                                        <DropdownMenuItem className="text-destructive">
+                                                            <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                                        </DropdownMenuItem>
+                                                    </AlertDialogTrigger>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                        This action cannot be undone. This will permanently delete the "{group.name}" group and remove it from all users.
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleDelete(group._id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                                        Delete
+                                                    </AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        )}
+                    </TableBody>
+                </Table>
+            </Card>
+        </div>
+    );
 }

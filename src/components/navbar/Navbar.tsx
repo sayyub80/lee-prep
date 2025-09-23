@@ -78,7 +78,7 @@ const Navbar = () => {
           {user ? (
             <>
               <Link href="/subscription">
-                <Button size="sm">
+                <Button className='cursor-pointer'size="sm">
                   <Crown className="w-4 h-4 mr-2" />
                   {user.subscription?.plan === 'pro' ? 'Pro Member' : 'Go Premium'}
                 </Button>
@@ -87,7 +87,7 @@ const Navbar = () => {
               <div className="relative" ref={dropdownRef}>
                 <button
                   onClick={toggleUserDropdown}
-                  className="flex items-center space-x-2 focus:outline-none"
+                  className="flex items-center space-x-2 focus:outline-none cursor-pointer"
                 >
                   <span className="font-medium">{user.name}</span>
                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -176,10 +176,10 @@ const Navbar = () => {
                           <img 
                             src={user.avatar} 
                             alt={user.name}
-                            className="w-full h-full rounded-full object-cover"
+                            className=" w-full h-full rounded-full object-cover"
                           />
                         ) : (
-                          <User className="w-4 h-4 text-primary" />
+                          <User className="w-4 cursor-pointer h-4 text-primary" />
                         )}
                       </div>
                       <div>
@@ -196,7 +196,7 @@ const Navbar = () => {
                     </Link>
                     <Link
                       href="/subscription"
-                      className="text-sm px-2 py-1 hover:bg-accent rounded flex items-center"
+                      className="  text-sm px-2 py-1 hover:bg-accent rounded flex items-center"
                       onClick={toggleMenu}
                     >
                       <Crown className="w-4 h-4 mr-2" />
@@ -213,12 +213,12 @@ const Navbar = () => {
                   !loading && (
                     <>
                       <Link href="/login" onClick={toggleMenu}>
-                        <Button variant="outline" size="sm" className="w-full">
+                        <Button variant="outline" size="sm" className="cursor-pointer w-full">
                           Login
                         </Button>
                       </Link>
-                      <Link href="/subscription" onClick={toggleMenu}>
-                        <Button size="sm" className="w-full">
+                      <Link  href="/subscription" onClick={toggleMenu}>
+                        <Button   size="sm" className=" w-full cursor-pointer">
                           <Crown className="w-4 h-4 mr-2" />
                           Go Premium
                         </Button>
