@@ -2,7 +2,8 @@ import { Schema, model, models, Document, Types } from 'mongoose';
 
 export interface IChallengeSubmission extends Document {
   user: Types.ObjectId;
-  challenge: Types.ObjectId;
+  challenge?: Types.ObjectId;
+  topic: string;
   audioUrl: string;
   transcript: string;
   score: number;
@@ -14,7 +15,8 @@ export interface IChallengeSubmission extends Document {
 
 const ChallengeSubmissionSchema = new Schema<IChallengeSubmission>({
   user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  challenge: { type: Schema.Types.ObjectId, ref: 'DailyChallenge', required: true },
+  challenge: { type: Schema.Types.ObjectId, ref: 'DailyChallenge' }, 
+  topic: { type: String, required: true },
   audioUrl: { type: String, required: true },
   transcript: { type: String, default: '' },
   score: { type: Number, default: 0 },

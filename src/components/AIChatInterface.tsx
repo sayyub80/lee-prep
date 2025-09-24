@@ -70,30 +70,69 @@ export const AIChatInterface: React.FC<AIChatInterfaceProps> = ({ persona, onGoB
         isListening ? recognitionRef.current.stop() : recognitionRef.current.start();
     };
 
-    const handleSend = async (text = input) => {
-        if (!text.trim()) return;
-        const userMessage = { text, sender: "user" as const };
-        setMessages((prev) => [...prev, userMessage]);
-        setInput("");
-        setIsLoading(true);
+  const handleSend = async (text = input) => {
+    if (!text.trim()) return;
+    const userMessage = { text, sender: "user" as const };
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+    setIsLoading(true);
+    setIsAiSpeaking(true); // Set speaking status immediately
 
-        try {
-            const history = [...messages, userMessage].map((m) => ({ role: m.sender === "user" ? "user" : "ai", content: m.text }));
-            const res = await fetch("/api/ai-chat", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ text, history, user, personaPrompt: persona.prompt }),
-            });
-            const data = await res.json();
+    // Clean up any previous audio that might be playing
+    if (audioSourceRef.current) audioSourceRef.current.stop();
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') audioContextRef.current.close();
+
+    try {
+        const history = [...messages, userMessage].map((m) => ({ role: m.sender === "user" ? "user" : "ai", content: m.text }));
+        
+        // --- SINGLE, OPTIMIZED API CALL ---
+        const response = await fetch("/api/ai-chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text, history, user, personaPrompt: persona.prompt }),
+        });
+
+        if (!response.ok) throw new Error("API request failed");
+
+        const contentType = response.headers.get('content-type');
+
+        if (contentType && contentType.includes('audio/mpeg')) {
+            // --- Success: Received audio stream ---
+            const aiText = decodeURIComponent(response.headers.get('X-AI-Response-Text') || 'Sorry, I had trouble speaking.');
+            const aiResponse = { text: aiText, sender: "ai" as const };
+            
+            // Display text and play audio simultaneously
+            setMessages((prev) => [...prev, aiResponse]);
+            
+            if (!isMuted) {
+                const audioData = await response.arrayBuffer();
+                audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+                const source = audioContextRef.current.createBufferSource();
+                audioSourceRef.current = source;
+                source.buffer = await audioContextRef.current.decodeAudioData(audioData);
+                source.connect(audioContextRef.current.destination);
+                source.start(0);
+                source.onended = () => setIsAiSpeaking(false);
+            } else {
+                setIsAiSpeaking(false);
+            }
+
+        } else {
+            
+            const data = await response.json();
             const aiResponse = { text: data.text || "Sorry, I couldn't process that.", sender: "ai" as const };
             setMessages((prev) => [...prev, aiResponse]);
-            speakResponse(aiResponse.text);
-        } catch {
-            setMessages((prev) => [...prev, { text: "Sorry, something went wrong.", sender: "ai" as const }]);
+            setIsAiSpeaking(false);
         }
+        
+    } catch (err) {
+        console.error("Error in handleSend:", err);
+        setMessages((prev) => [...prev, { text: "Sorry, something went wrong.", sender: "ai" as const }]);
+        setIsAiSpeaking(false);
+    } finally {
         setIsLoading(false);
-    };
-    
+    }
+};
     const speakResponse = async (text: string) => {
         if (!text || isMuted) return;
 

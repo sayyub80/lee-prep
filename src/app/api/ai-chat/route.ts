@@ -1,23 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
+// --- ElevenLabs Constants ---
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
+const VOICE_ID = '21m00Tcm4TlvDq8ikWAM'; 
+const ELEVENLABS_API_URL = `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`;
 
-export async function POST(req: NextRequest) {
-  
-  const { text, history, user, personaPrompt } = await req.json(); // history: [{role: 'user'|'ai', content: string}]
-  if (!text) {
-    return NextResponse.json({ error: 'No text provided' }, { status: 400 });
-  }
-   if (!personaPrompt) {
-    return NextResponse.json({ error: 'No persona provided' }, { status: 400 });
-  }
+// --- Gemini Setup ---
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-  try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+async function getAiTextResponse(text: string, history: any[], user: any, personaPrompt: string) {
+    
+    // --- FIX: Conditionally add the greeting instruction based on conversation length ---
+    const greetingInstruction = (history.length <= 1) 
+        ? "- At the very beginning of the conversation, greet the user by their name. Afterwards, only use their name where it feels natural."
+        : "- Do not greet the user again. Continue the conversation naturally.";
 
-    // The system prompt now dynamically includes the selected persona's instructions
-    const systemPrompt = {
-      role: "model",
+    const systemInstruction = {
+      role: "system",
       parts: [{
         text: `
           ${personaPrompt}
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
           ---
           General Rules:
           - The user's name is ${user ? user.name : 'Guest'}. Their current English level is ${user ? user.level : 'beginner'}.
-          - At the very beginning of the conversation, greet the user by their name. Afterwards, only use their name where it feels natural.
+          ${greetingInstruction} 
           - Do NOT use markdown like ** or * for formatting. Use numbered lists (1., 2.) if needed.
           - Keep your responses concise, natural, and encouraging.
           - If the user makes a grammar or vocabulary mistake, first give a natural reply to their message, and then on a new line, provide a gentle correction. For example:
@@ -36,28 +36,75 @@ export async function POST(req: NextRequest) {
         `
       }]
     };
-
-    // Build Gemini-style history with system prompt at the start
+    
     const geminiHistory =
       history && Array.isArray(history)
-        ? [systemPrompt, ...history.map((msg: any) => ({
+        ? history.map((msg: { role: 'user' | 'ai'; content: string }) => ({
             role: msg.role === 'user' ? 'user' : 'model',
             parts: [{ text: msg.content }],
-          }))]
-        : [systemPrompt];
+          }))
+        : [];
 
-    // Create chat session with history using your preferred method
-    const chat = ai.chats.create({
-      model: 'gemini-1.5-flash',
-      history: geminiHistory,
+    const model = genAI.getGenerativeModel({ 
+        model: 'gemini-1.5-flash',
+        systemInstruction: systemInstruction,
+    });
+    
+    const chat = model.startChat({ history: geminiHistory });
+    const result = await chat.sendMessage(text);
+    return result.response.text();
+}
+
+
+export async function POST(req: NextRequest) {
+  try {
+    const { text, history, user, personaPrompt } = await req.json();
+    if (!text || !personaPrompt) {
+      return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
+    }
+
+    const aiText = await getAiTextResponse(text, history, user, personaPrompt);
+
+    if (!aiText) {
+        throw new Error("AI failed to generate a text response.");
+    }
+    
+    if (!ELEVENLABS_API_KEY) {
+        return NextResponse.json({ text: aiText });
+    }
+    
+    const textToSpeak = aiText.split("\n\nFeedback:")[0];
+
+    const ttsResponse = await fetch(ELEVENLABS_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'xi-api-key': ELEVENLABS_API_KEY,
+        'accept': 'audio/mpeg',
+      },
+      body: JSON.stringify({
+        text: textToSpeak,
+        model_id: 'eleven_monolingual_v1',
+        voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+      }),
     });
 
-    // Send user message
-    const response = await chat.sendMessage({ message: text });
+    if (!ttsResponse.ok || !ttsResponse.body) {
+      console.error('ElevenLabs API Error:', await ttsResponse.text());
+      return NextResponse.json({ text: aiText });
+    }
 
-    return NextResponse.json({ text: response.text });
+    const responseHeaders = new Headers();
+    responseHeaders.set('Content-Type', 'audio/mpeg');
+    responseHeaders.set('X-AI-Response-Text', encodeURIComponent(aiText));
+
+    return new NextResponse(ttsResponse.body, {
+      status: 200,
+      headers: responseHeaders,
+    });
+
   } catch (error) {
-    console.error('Gemini AI Error:', error);
+    console.error('AI Chat Error:', error);
     return NextResponse.json({ error: 'AI processing failed' }, { status: 500 });
   }
 }

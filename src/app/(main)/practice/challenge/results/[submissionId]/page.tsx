@@ -17,7 +17,8 @@ interface Submission {
     improvementArea: string;
   };
   audioUrl: string;
-  challenge: {
+  topic: string; 
+  challenge?: { 
     topic: string;
   };
 }
@@ -25,7 +26,6 @@ interface Submission {
 export default function ChallengeResultsPage() {
   const router = useRouter();
   const params = useParams();
-  // This will now correctly find the ID from the URL because the folder name matches
   const submissionId = params.submissionId as string;
 
   const [submission, setSubmission] = useState<Submission | null>(null);
@@ -74,6 +74,9 @@ export default function ChallengeResultsPage() {
   if (!submission) {
     return <div className="flex justify-center items-center h-[calc(100vh-80px)]">No submission data found.</div>;
   }
+  
+  // --- FIX: Conditionally access the topic ---
+  const topic = submission.challenge?.topic || submission.topic;
 
   return (
     <div className="bg-secondary/30 min-h-[calc(100vh-80px)] py-12 px-4">
@@ -87,7 +90,8 @@ export default function ChallengeResultsPage() {
           <CardHeader className="text-center">
             <Award className="w-12 h-12 mx-auto text-amber-500" />
             <CardTitle className="text-3xl mt-2">Challenge Complete!</CardTitle>
-            <CardDescription className="text-base">Here's your feedback for the topic: "{submission.challenge.topic}"</CardDescription>
+            {/* --- FIX: Use the safe topic variable --- */}
+            <CardDescription className="text-base">Here's your feedback for the topic: "{topic}"</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid md:grid-cols-2 gap-8 items-center">
@@ -139,7 +143,7 @@ export default function ChallengeResultsPage() {
                 <Button size="lg" asChild>
                     <Link href="/practice">
                        <RefreshCw className="w-4 h-4 mr-2"/>
-                       Try Another Challenge Tomorrow
+                       Try Another Challenge
                     </Link>
                 </Button>
             </div>

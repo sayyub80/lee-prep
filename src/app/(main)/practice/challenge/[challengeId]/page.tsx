@@ -1,29 +1,29 @@
 'use client';
+
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
-import { Loader2, Mic, Check, AlertTriangle, Play, Pause } from 'lucide-react';
+import { Loader2, Mic, Check, AlertTriangle, Play, Pause, Square, Clock, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { motion } from 'framer-motion';
 
 type Status = 'idle' | 'ready' | 'recording' | 'finished' | 'uploading' | 'evaluating' | 'error';
 
-interface Challenge {
+interface ChallengeData {
   _id: string;
   topic: string;
+  timeLimit: number; // in seconds
   reward: number;
-  timeLimit: number;
 }
 
-export default function ChallengePage() {
-  const { user } = useAuth();
+export default function DailyChallengePage() {
   const router = useRouter();
   const params = useParams();
   const challengeId = params.challengeId as string;
-  
-  const [challenge, setChallenge] = useState<Challenge | null>(null);
+
+  const [challenge, setChallenge] = useState<ChallengeData | null>(null);
   const [status, setStatus] = useState<Status>('idle');
-  const [timeLeft, setTimeLeft] = useState(0);
+  const [timeLeft, setTimeLeft] = useState<number>(0);
   const [error, setError] = useState('');
   const [liveTranscript, setLiveTranscript] = useState('');
   
@@ -31,9 +31,35 @@ export default function ChallengePage() {
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const recognitionRef = useRef<any>(null);
-  const finalTranscriptRef = useRef<string>(''); // Ref to store the complete final transcript
+  const finalTranscriptRef = useRef<string>('');
 
+  // --- NEW: Fetch challenge details ---
   useEffect(() => {
+    if (!challengeId) {
+      setError("No challenge ID was provided.");
+      setStatus('error');
+      return;
+    }
+
+    const fetchChallenge = async () => {
+      try {
+        const res = await fetch(`/api/challenges/${challengeId}`);
+        const data = await res.json();
+        if (data.success) {
+          setChallenge(data.data);
+          setTimeLeft(data.data.timeLimit); // Set initial time from challenge data
+          setStatus('ready');
+        } else {
+          throw new Error(data.error || "Failed to load challenge");
+        }
+      } catch (err: any) {
+        setError(err.message);
+        setStatus('error');
+      }
+    };
+    fetchChallenge();
+
+    // Setup speech recognition
     if (typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
@@ -42,19 +68,15 @@ export default function ChallengePage() {
       recognition.interimResults = true;
       recognition.lang = 'en-US';
 
-      // --- THIS IS THE CORRECTED LOGIC ---
       recognition.onresult = (event: any) => {
         let interim_transcript = '';
-        finalTranscriptRef.current = ''; // Reset and rebuild the final transcript each time
-
-        for (let i = 0; i < event.results.length; ++i) {
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
           if (event.results[i].isFinal) {
             finalTranscriptRef.current += event.results[i][0].transcript + ' ';
           } else {
             interim_transcript += event.results[i][0].transcript;
           }
         }
-        // Update the live display with the full final transcript plus the current interim part
         setLiveTranscript(finalTranscriptRef.current + interim_transcript);
       };
 
@@ -62,35 +84,23 @@ export default function ChallengePage() {
         console.error("Speech Recognition Error:", event.error);
         setError("Sorry, a speech recognition error occurred.");
       };
-
     }
-  }, []);
 
-
-  useEffect(() => {
-    const fetchChallenge = async () => {
-      try {
-        const res = await fetch('/api/challenges/today');
-        const data = await res.json();
-        if (data.success && data.data._id === challengeId) {
-          setChallenge(data.data);
-          setTimeLeft(data.data.timeLimit);
-          setStatus('ready');
-        } else {
-          throw new Error("Challenge not found or ID mismatch.");
-        }
-      } catch (err: any) {
-        setError(err.message || "Could not load the challenge.");
-        setStatus('error');
+    // Cleanup for speech recognition
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+        recognitionRef.current = null;
+      }
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
       }
     };
-    if (challengeId) {
-      fetchChallenge();
-    }
+
   }, [challengeId]);
 
   const startRecording = async () => {
-    if (status !== 'ready' || !recognitionRef.current) return;
+    if (status !== 'ready' || !recognitionRef.current || !challenge) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaRecorderRef.current = new MediaRecorder(stream);
@@ -116,7 +126,7 @@ export default function ChallengePage() {
       }, 1000);
 
     } catch (err) {
-      setError("Microphone access denied. Please enable it in your browser settings.");
+      setError("Microphone access denied. Please enable it.");
       setStatus('error');
     }
   };
@@ -125,7 +135,7 @@ export default function ChallengePage() {
     if (timerRef.current) clearInterval(timerRef.current);
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
-      recognitionRef.current.stop();
+      if(recognitionRef.current) recognitionRef.current.stop();
     }
     setStatus('finished');
   };
@@ -136,7 +146,6 @@ export default function ChallengePage() {
     const formData = new FormData();
     formData.append('audio', audioBlob, 'challenge-recording.webm');
     formData.append('challengeId', challengeId);
-    // Use the final transcript from the ref for submission
     formData.append('transcript', finalTranscriptRef.current.trim());
     
     try {
@@ -147,49 +156,82 @@ export default function ChallengePage() {
       setStatus('evaluating');
       router.push(`/practice/challenge/results/${data.submissionId}`);
     } catch (err: any) {
-      setError(err.message);
+      console.error("Submission error:", err);
+      setError(err.message || "Failed to submit challenge.");
       setStatus('error');
     }
   };
 
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
   const getStatusContent = () => {
+    if (!challenge && (status === 'idle' || status === 'ready')) {
+      return <Loader2 className="animate-spin" size={32} />;
+    }
     switch(status) {
       case 'recording':
         return (
-          <div className="flex flex-col items-center">
-            <h2 className="text-6xl font-bold font-mono tracking-tighter text-primary">{new Date(timeLeft * 1000).toISOString().substr(14, 5)}</h2>
-            <p className="text-muted-foreground mt-4 h-6 px-4">{liveTranscript}</p>
-          </div>
+          <motion.div
+            key="recording-state"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex flex-col items-center"
+          >
+            <h2 className="text-6xl font-bold font-mono tracking-tighter text-indigo-600">
+                {formatTime(timeLeft)}
+            </h2>
+            <p className="text-muted-foreground mt-4 h-6 px-4 text-center text-lg">{liveTranscript || "Speak clearly into your microphone..."}</p>
+          </motion.div>
         );
-      case 'uploading':
-        return <div className="flex flex-col items-center gap-2"><Loader2 className="animate-spin" size={32} /><p>Uploading...</p></div>;
-      case 'evaluating':
-         return <div className="flex flex-col items-center gap-2"><Loader2 className="animate-spin" size={32} /><p>AI is analyzing your speech...</p></div>;
-      case 'finished':
-        return <div className="flex flex-col items-center gap-2"><Check size={32} /><p>Finished!</p></div>;
-      case 'error':
-        return <div className="flex flex-col items-center gap-2 text-destructive"><AlertTriangle size={32} /><p className="max-w-xs text-center">{error}</p></div>;
-      case 'ready':
-      default:
-        return <Mic size={48} className="text-muted-foreground" />;
+      case 'uploading': return <div className="flex flex-col items-center gap-2"><Loader2 className="animate-spin" size={32} /><p>Uploading your recording...</p></div>;
+      case 'evaluating': return <div className="flex flex-col items-center gap-2"><Loader2 className="animate-spin" size={32} /><p>AI is analyzing your speech...</p></div>;
+      case 'finished': return <div className="flex flex-col items-center gap-2"><Check size={32} className="text-green-500"/><p>Recording complete!</p></div>;
+      case 'error': return <div className="flex flex-col items-center gap-2 text-destructive"><AlertTriangle size={32} /><p className="max-w-xs text-center">{error}</p></div>;
+      case 'ready': default: return (
+        <motion.div
+            key="ready-state"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex flex-col items-center"
+        >
+            <Mic size={48} className="text-gray-400 mb-4" />
+            <p className="text-lg text-muted-foreground">Click Start to begin.</p>
+        </motion.div>
+      );
     }
   };
   
   return (
-    <div className="flex items-center justify-center min-h-[calc(100vh-80px)] bg-secondary/30 p-4">
+    <div className="flex items-center justify-center min-h-[calc(100vh-80px)] bg-gradient-to-br from-indigo-50 to-purple-50 p-4">
       <Card className="w-full max-w-2xl text-center shadow-2xl">
         <CardHeader>
-          <CardTitle className="text-3xl">Today's Challenge</CardTitle>
-          <CardDescription className="text-lg pt-2">"{challenge?.topic}"</CardDescription>
+          <CardTitle className="text-3xl font-bold text-gray-800">Today's Challenge</CardTitle>
+          {challenge ? (
+            <CardDescription className="text-lg pt-2 text-indigo-700 font-medium">"{challenge.topic}"</CardDescription>
+          ) : (
+            <CardDescription className="text-lg pt-2 text-muted-foreground">Loading challenge topic...</CardDescription>
+          )}
+          {challenge && (
+            <div className="flex justify-center items-center gap-4 mt-2 text-sm text-gray-600">
+                <div className="flex items-center gap-1"><Clock className="w-4 h-4"/> {formatTime(challenge.timeLimit)}</div>
+                <div className="flex items-center gap-1"><Zap className="w-4 h-4"/> {challenge.reward} XP</div>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           <div className="my-12 flex items-center justify-center h-40">
             {getStatusContent()}
           </div>
-          <div className="flex justify-center">
-            {status === 'ready' && <Button size="lg" onClick={startRecording}>Start Challenge</Button>}
-            {status === 'recording' && <Button size="lg" variant="destructive" onClick={stopRecording}>Stop Recording</Button>}
-            {status === 'error' && <Button size="lg" onClick={() => window.location.reload()}>Try Again</Button>}
+          <div className="flex justify-center gap-4">
+            {status === 'ready' && <Button size="lg" onClick={startRecording}><Mic className="mr-2"/> Start Speaking</Button>}
+            {status === 'recording' && <Button size="lg" variant="destructive" onClick={stopRecording}><Square className="mr-2"/> Stop Recording</Button>}
+            {(status === 'error' || (status === 'finished' && !error)) && (
+              <Button size="lg" onClick={() => router.push('/practice')}>Back to Practice</Button>
+            )}
           </div>
         </CardContent>
       </Card>

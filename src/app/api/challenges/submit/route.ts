@@ -5,29 +5,26 @@ import User from '@/models/User';
 import DailyChallenge from '@/models/DailyChallenge';
 import ChallengeSubmission from '@/models/ChallengeSubmission';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import OpenAI from 'openai'; // <-- Import OpenAI
+import OpenAI from 'openai';
 
-// --- Initialize the AI clients ---
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash"});
 
-// --- Function to transcribe audio using OpenAI Whisper ---
 async function transcribeAudio(audioFile: File): Promise<string> {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error("OpenAI API key is not configured.");
   }
   try {
-    // Send the audio file to the Whisper API for transcription
     const transcription = await openai.audio.transcriptions.create({
       file: audioFile,
-      model: "whisper-1", // This is OpenAI's powerful transcription model
+      model: "whisper-1",
     });
     console.log("Whisper Transcription Successful:", transcription.text);
     return transcription.text;
   } catch (error) {
     console.error("Error transcribing audio with OpenAI:", error);
-    return ""; // Return an empty string if transcription fails
+    return "";
   }
 }
 
@@ -72,34 +69,48 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const audio = formData.get('audio') as File | null;
     const challengeId = formData.get('challengeId') as string | null;
+    const topic = formData.get('topic') as string | null;
 
-    if (!audio || !challengeId) {
-      return NextResponse.json({ success: false, error: 'Missing audio or challengeId' }, { status: 400 });
+    if (!audio || (!challengeId && !topic)) {
+      return NextResponse.json({ success: false, error: 'Missing audio, challengeId, or topic' }, { status: 400 });
     }
-
-    const challenge = await DailyChallenge.findById(challengeId);
-    if (!challenge) {
-      return NextResponse.json({ success: false, error: 'Challenge not found' }, { status: 404 });
-    }
+    
+    let challengeTopic = topic;
+    let submissionData: any = { user: userId };
     
     const transcript = await transcribeAudio(audio);
-    
     const audioUrl = `/uploads/placeholder.webm`; 
-    const { score, feedback } = await getAIFeedback(challenge.topic, transcript);
+
+    if (challengeId) {
+        const challenge = await DailyChallenge.findById(challengeId);
+        if (!challenge) {
+            return NextResponse.json({ success: false, error: 'Challenge not found' }, { status: 404 });
+        }
+        challengeTopic = challenge.topic;
+        submissionData.challenge = challengeId;
+        
+        // Correctly get feedback before checking the score
+        const { score, feedback } = await getAIFeedback(challengeTopic ?? "", transcript);
+        
+        if (challenge.reward > 0 && score > 0) {
+             await User.updateOne({ _id: userId }, { $inc: { credits: challenge.reward } });
+        }
+        submissionData = { ...submissionData, score, feedback };
+
+    } else if (challengeTopic) {
+        const { score, feedback } = await getAIFeedback(challengeTopic ?? "", transcript);
+        submissionData = { ...submissionData, score, feedback };
+    } else {
+       return NextResponse.json({ success: false, error: 'Topic could not be determined' }, { status: 400 });
+    }
 
     const newSubmission = new ChallengeSubmission({
-        user: userId,
-        challenge: challengeId,
+        ...submissionData,
+        topic: challengeTopic,
         audioUrl,
         transcript,
-        score,
-        feedback
     });
     await newSubmission.save();
-    
-    if (score > 0) {
-        await User.updateOne({ _id: userId }, { $inc: { credits: challenge.reward } });
-    }
     
     return NextResponse.json({ success: true, submissionId: newSubmission._id });
 
