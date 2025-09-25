@@ -3,11 +3,11 @@ import dbConnect from '@/lib/db';
 import DailyChallenge from '@/models/DailyChallenge';
 
 export async function GET(
-  req: NextRequest,
-  context: { params: { challengeId: string } }
+   req: NextRequest,
+  context: { params: Promise<{ challengeId: string }> }
 ) {
   await dbConnect();
-  const { challengeId } = context.params;
+  const { challengeId } = await context.params;
 
   if (!challengeId) {
     return NextResponse.json({ success: false, error: 'Challenge ID is missing' }, { status: 400 });
