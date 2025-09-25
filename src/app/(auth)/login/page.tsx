@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
@@ -9,17 +9,21 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { AlertTriangle } from 'lucide-react';
 
-export default function LoginPage() {
-  const router = useRouter();
+interface LoginFormProps {
+  user: any; // Replace 'any' with your actual user type if available
+  loading: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  router: ReturnType<typeof useRouter>;
+}
+
+function LoginForm({ user, loading, login, router }: LoginFormProps) {
   const searchParams = useSearchParams();
-  const { user, loading, login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [showSuspendedModal, setShowSuspendedModal] = useState(false);
 
   useEffect(() => {
-    // This is for users who are ALREADY logged in and land here
     if (user) {
       router.push('/dashboard');
     }
@@ -32,21 +36,18 @@ export default function LoginPage() {
     try {
       await login(email, password);
     } catch (err: any) {
-      // --- FIX: Check for the specific suspended error message from the API ---
       if (err.message && err.message.toLowerCase().includes('suspended')) {
-          setShowSuspendedModal(true);
+        setShowSuspendedModal(true);
       } else {
-          setError(err.message || 'Login failed. Please try again.');
+        setError(err.message || 'Login failed. Please try again.');
       }
     }
   };
 
- const handleGoogleSignIn = () => {
+  const handleGoogleSignIn = () => {
     window.location.href = '/api/auth/google';
   };
 
-  // The "Loading..." screen is no longer needed here
-  
   return (
     <>
       <AuthLayout
@@ -62,8 +63,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* ... (rest of the form remains the same) ... */}
-           <div>
+          <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
               Email
             </label>
@@ -111,21 +111,21 @@ export default function LoginPage() {
               Sign up
             </Link>
           </p>
-           <div style={{ marginTop: '2rem' }}>
-          <button
-            type="button"
-            onClick={handleGoogleSignIn}
-            className="w-full bg-white border border-gray-300 text-gray-700 py-2 px-4 rounded-md flex items-center justify-center gap-2 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
-          >
-            <img
-              src="https://developers.google.com/identity/images/g-logo.png"
-              alt="Google"
-              width={20}
-              height={20}
-            />
-            Sign in with Google
-          </button>
-        </div>
+          <div style={{ marginTop: '2rem' }}>
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              className="w-full bg-white border border-gray-300 text-gray-700 py-2 px-4 rounded-md flex items-center justify-center gap-2 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
+            >
+              <img
+                src="https://developers.google.com/identity/images/g-logo.png"
+                alt="Google"
+                width={20}
+                height={20}
+              />
+              Sign in with Google
+            </button>
+          </div>
         </div>
       </AuthLayout>
 
@@ -134,8 +134,8 @@ export default function LoginPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-                <AlertTriangle className="text-destructive" />
-                Account Suspended
+              <AlertTriangle className="text-destructive" />
+              Account Suspended
             </DialogTitle>
             <DialogDescription className="pt-2">
               Your account has been suspended due to a violation of our terms of service. Please contact support for assistance.
@@ -147,5 +147,16 @@ export default function LoginPage() {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+export default function LoginPage() {
+  const router = useRouter();
+  const { user, loading, login } = useAuth();
+
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <LoginForm user={user} loading={loading} login={login} router={router} />
+    </Suspense>
   );
 }

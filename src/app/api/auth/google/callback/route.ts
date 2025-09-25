@@ -7,7 +7,7 @@ import { cookies } from 'next/headers';
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const referralCode = cookieStore.get('google_referral_code')?.value;
 
   if (!code) {
